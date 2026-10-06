@@ -1,8 +1,19 @@
 // Loop service worker: app shell cached on install, Esri tiles cached as they are seen (so a hole viewed once works offline).
-const SHELL = "loop-shell-v202610061600"; const TILES = "loop-tiles-v1";
+// SHELL is a hash of the page, the engine and the data: any rebuild changes this file, the browser installs the new worker, it caches the new
+// shell, drops the old one, takes over the open pages and reloads them (an update, never a first install, has old shell caches to drop).
+const SHELL = "loop-shell-e56ea7d8f8"; const TILES = "loop-tiles-v1";
 const SHELL_FILES = ["./", "./index.html", "./engine.js", "./data.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_FILES)).then(() => self.skipWaiting())); });
-self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith("loop-shell-") && k !== SHELL).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
+self.addEventListener("activate", e => { e.waitUntil((async () => {
+  const old = (await caches.keys()).filter(k => k.startsWith("loop-shell-") && k !== SHELL);
+  await Promise.all(old.map(k => caches.delete(k)));
+  await self.clients.claim();
+  if (!old.length) return;   // a first install: nothing was showing the previous version
+  const cs = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  // after activation has completed (a navigation awaited inside it would wait for this worker's fetch handler, which waits for activation)
+  setTimeout(() => cs.forEach(c => { const msg = () => { try { c.postMessage({ type: "loop-reload" }); } catch (err) {} };
+    try { c.navigate(c.url).catch(msg); } catch (err) { msg(); } }), 50);
+})()); });
 self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
   if (url.hostname.endsWith("arcgisonline.com")) {
