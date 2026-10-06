@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A caddie for the seven courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
+<meta name="color-scheme" content="light dark">
+<title>Loop</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Loop">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="robots" content="noindex, nofollow">
+<script>window.LOOP_PHONE = true;</script>
+
+<style>
+:root{
+  --paper:#ffffff; --panel:#f3f4f2; --panel2:#e9ebe7; --ink:#17191c; --ink2:#4a4f55; --mute:#7c838b; --rule:#d9dcd6;
+  --engine:#c8102e; --plan:#2457c5; --ok:#2f8f46;
+  --fw:#6fbf5a; --rough:#3f7a3a; --sand:#ead27d; --water:#4f93dd; --desert:#cdb08a; --green:#2ecc71;
+  --font:"Segoe UI Variable Text","Segoe UI",-apple-system,system-ui,"Helvetica Neue",Arial,sans-serif;
+  --num:Bahnschrift,"Segoe UI Variable Display","Roboto Condensed","Arial Narrow",-apple-system,system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#121416;--panel:#1b1e21;--panel2:#24282c;--ink:#eceef0;--ink2:#b8bec5;--mute:#8a9199;--rule:#2d3237;--engine:#ff4d63;--plan:#6c9bff;--ok:#5ccf7a;color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#121416;--panel:#1b1e21;--panel2:#24282c;--ink:#eceef0;--ink2:#b8bec5;--mute:#8a9199;--rule:#2d3237;--engine:#ff4d63;--plan:#6c9bff;--ok:#5ccf7a;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 var(--font)}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:1px solid var(--rule);border-radius:6px;padding:6px 10px}
+button:hover{border-color:var(--ink2)}
+button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--engine);outline-offset:2px}
+a{color:inherit}
+.num{font-family:var(--num);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--rule)}
+.bar{display:flex;align-items:center;gap:14px;padding:10px 16px;flex-wrap:wrap}
+.wordmark{font-family:var(--num);font-weight:700;font-size:22px;letter-spacing:.02em;margin-right:4px}
+.wordmark small{display:block;font:12px/1.2 var(--font);color:var(--mute);font-weight:400;letter-spacing:0}
+select.course{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:7px 10px;font-weight:600;max-width:60vw}
+nav.views{display:flex;gap:2px;margin-left:auto;background:var(--panel);border-radius:8px;padding:3px}
+nav.views button{border:0;padding:6px 12px;border-radius:6px;color:var(--ink2)}
+nav.views button[aria-current="page"]{background:var(--paper);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:600}
+.cond{display:flex;gap:8px;align-items:center;color:var(--ink2);font-size:13px;border:1px solid transparent;border-radius:6px;padding:5px 8px}
+.cond:hover{border-color:var(--rule)} .cond[aria-expanded="true"]{background:var(--panel)}
+.quick{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:6px 16px 10px;font-size:13.5px;color:var(--ink2)}
+.quick label{display:flex;gap:6px;align-items:center}
+.quick input,.quick select{padding:4px 6px;border:1px solid var(--rule);border-radius:6px;background:var(--paper)}
+.hint{margin:0 0 12px;padding:10px 14px;background:var(--panel);border-radius:8px;font-size:13.5px;color:var(--ink2);display:flex;justify-content:space-between;gap:12px;align-items:center}
+.hint button{padding:3px 8px;font-size:12px}
+@media (max-width:860px){.wordmark small{display:none}.wordmark{font-size:20px}.bar{padding:8px 12px}.holes{padding:0 12px 8px}main{padding:12px 12px 60px}}
+@media (max-width:560px){.wordmark{display:none}.bar{gap:6px 10px;padding:6px 12px}select.course{max-width:none;flex:1;padding:5px 8px;font-size:14px}.cond{font-size:12px;padding:3px 6px;gap:6px}nav.views button{padding:4px 6px;font-size:13px}.holes{padding:0 12px 6px;gap:3px}.holes button{min-width:34px;font-size:13px;padding:4px 0}.holes button small{font-size:9px}}
+.holes{display:flex;gap:4px;padding:0 16px 10px;overflow-x:auto;scrollbar-width:thin}
+.holes button{flex:none;min-width:40px;padding:5px 0;border-radius:6px;border:1px solid var(--rule);font-family:var(--num);font-size:15px;line-height:1;background:var(--paper)}
+.holes button small{display:block;font:10px/1.3 var(--font);color:var(--mute)}
+.holes button[aria-current="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.holes button[aria-current="true"] small{color:var(--panel2)}
+main{padding:14px 16px 60px;max-width:1500px;margin:0 auto}
+.hole{display:grid;grid-template-columns:minmax(300px,440px) minmax(0,1fr);gap:22px;align-items:start}
+.hole>*{min-width:0}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:860px){.hole{grid-template-columns:minmax(0,1fr)}.bar{gap:10px}nav.views{margin-left:0;width:100%}nav.views button{flex:1}}
+.mapwrap{position:relative;background:var(--panel);border-radius:10px;overflow:hidden}
+.mapwrap canvas{display:block;width:100%;height:auto;cursor:crosshair}
+.maplegend{display:flex;flex-wrap:wrap;gap:10px 14px;padding:8px 10px;font-size:12px;color:var(--ink2)}
+.maplegend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.maptools{position:absolute;top:8px;right:8px;display:flex;gap:6px}
+.maptools button{background:rgba(255,255,255,.88);color:#17191c;border-color:transparent;font-size:12px;padding:4px 8px;backdrop-filter:blur(4px)}
+.maphint{position:absolute;left:8px;top:44px;font-size:12px;color:#fff;background:rgba(0,0,0,.55);padding:4px 8px;border-radius:6px;max-width:70%}
+.maphint.fix{background:var(--plan);font-size:13px;font-weight:600}
+@media (max-width:560px){.maptools{flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 16px)}.maphint{top:46px}}
+.card h1{font-family:var(--num);font-weight:700;font-size:30px;line-height:1.05;margin:0}
+.card h1 .meta{font:15px/1.3 var(--font);font-weight:400;color:var(--ink2);display:block;margin-top:6px}
+.shot{margin:18px 0 10px;padding:16px 18px;border-left:4px solid var(--engine);background:var(--panel);border-radius:0 10px 10px 0}
+.shot .big{font-family:var(--num);font-size:34px;line-height:1.05;font-weight:700}
+.shot .big small{font-size:18px;font-weight:400;color:var(--ink2);margin-left:6px}
+.shot .E{float:right;text-align:right;font-family:var(--num);font-size:34px;line-height:1.05;font-weight:700}
+.shot .E small{display:block;font:12px/1.3 var(--font);color:var(--mute);font-weight:400}
+.odds{display:flex;height:14px;border-radius:4px;overflow:hidden;margin:12px 0 6px;background:var(--panel2)}
+.odds i{display:block;height:100%}
+.oddsl{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--ink2)}
+.oddsl span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;background:var(--c)}
+.rows{margin:6px 0 0;font-size:14.5px}
+.rows div{padding:5px 0;border-top:1px solid var(--rule);display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}
+.rows div:first-child{border-top:0}
+.rows b{font-family:var(--num);font-weight:600;font-size:16px}
+.go{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.go>div{padding:10px 12px;border:1px solid var(--rule);border-radius:8px}
+.go>div.win{border-color:var(--engine);box-shadow:inset 0 0 0 1px var(--engine)}
+.go .lbl{font-size:12px;color:var(--mute)}
+.go .v{font-family:var(--num);font-size:26px;font-weight:700;line-height:1.1}
+.go .d{font-size:13px;color:var(--ink2)}
+h2{font-family:var(--num);font-weight:600;font-size:16px;letter-spacing:.02em;margin:22px 0 8px;color:var(--ink2)}
+.plan{border-left:4px solid var(--plan);padding:10px 14px;background:var(--panel);border-radius:0 10px 10px 0;font-size:14.5px}
+.plan .say{color:var(--ink)}
+.plan .vs{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--panel2);color:var(--ink2)}
+.chip.ok{background:#e3f4e8;color:#1f6b33}.chip.bad{background:#fde7ea;color:#9b1024}.chip.new{background:#e8eefc;color:#1e3f9a}
+:root[data-theme="dark"] .chip.ok,:root:not([data-theme="light"]) .chip.ok{background:#1b3a25;color:#8fe0a4}
+.plan details{margin-top:8px}.plan summary{cursor:pointer;color:var(--ink2);font-size:13px}
+.plan p{margin:8px 0 0;color:var(--ink2);font-size:13.5px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--mute);font-size:12px;padding:6px 8px;border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--rule);vertical-align:top}
+td.n,th.n{text-align:right;font-family:var(--num);font-variant-numeric:tabular-nums}
+tr.pick td{background:var(--panel)}
+tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
+.mini{display:inline-flex;height:8px;width:90px;border-radius:3px;overflow:hidden;background:var(--panel2);vertical-align:middle}
+.mini i{display:block;height:100%}
+.src{font-size:12.5px;color:var(--mute);margin-top:18px;line-height:1.5}
+.profile{width:100%;height:110px;display:block;margin:4px 0 0}
+.round table td,.round table th{padding:7px 8px}
+.round .tot{font-family:var(--num);font-size:18px;font-weight:700}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:12px 0 18px}
+.kpi{padding:12px 14px;background:var(--panel);border-radius:10px}
+.kpi .v{font-family:var(--num);font-size:30px;font-weight:700;line-height:1.05}
+.kpi .l{font-size:12.5px;color:var(--mute);margin-top:4px}
+.kpi.engine .v{color:var(--engine)}.kpi.plan .v{color:var(--plan)}
+.audit li{padding:10px 0;border-top:1px solid var(--rule);list-style:none}
+.audit ul{padding:0;margin:0}
+.audit .imp{float:right;font-family:var(--num);font-weight:700;font-size:18px;color:var(--engine)}
+.audit .where{font-weight:600}
+.audit .ev{color:var(--ink2);font-size:13.5px;margin-top:3px}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;max-width:1100px}
+.settings section{padding:14px 16px;background:var(--panel);border-radius:10px}
+.settings h3{margin:0 0 8px;font-family:var(--num);font-size:17px;font-weight:600}
+.settings label{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--rule);font-size:14px}
+.settings label:first-of-type{border-top:0}
+.settings input[type=number],.settings select{width:110px;padding:5px 8px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);text-align:right}
+.settings input[type=range]{width:150px}
+.settings textarea{width:100%;height:120px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);padding:8px;font:13px/1.4 ui-monospace,Consolas,monospace}
+.settings .help{font-size:12.5px;color:var(--mute);margin:6px 0 0}
+.clubs td input{width:58px;padding:3px 6px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);text-align:right}
+.progress{font-size:12.5px;color:var(--mute);margin:4px 0 10px}
+.empty{padding:40px;text-align:center;color:var(--mute)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:8px;font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+.toast.on{opacity:1}
+.pocket{display:none}
+@media print{
+  header,.mapwrap,.maplegend,.progress,nav,.noprint{display:none!important}
+  html,body{font-size:11px;color:#000;background:#fff}
+  main{padding:0;max-width:none}
+  .pocket{display:block}
+  .pocket table{font-size:10.5px}.pocket td,.pocket th{padding:3px 5px;border-bottom:1px solid #999}
+  .pocket h1{font:700 18px var(--num);margin:0 0 4px}
+  .pocket .sub{font-size:10px;color:#333;margin-bottom:6px}
+  .round:not(.printing),.audit,.settings,.hole{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.sr{position:absolute;left:-9999px}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="wordmark">Loop<small>the caddie built from your data</small></div>
+    <select class="course" id="courseSel" aria-label="Course"></select>
+    <button class="cond" id="condChip" aria-expanded="false" title="Today's conditions"></button>
+    <nav class="views" aria-label="Views">
+      <button data-view="hole" aria-current="page">Hole</button>
+      <button data-view="round">Round</button>
+      <button data-view="audit">Plan audit</button>
+      <button data-view="settings">Settings</button>
+    </nav>
+  </div>
+  <div class="quick" id="quick" hidden>
+    <label>Wind <input type="number" id="q_wind" min="0" max="40" step="1" style="width:56px"> mph from <input type="number" id="q_from" min="0" max="359" step="5" style="width:60px">°</label>
+    <label>Temp <input type="number" id="q_temp" min="30" max="120" style="width:56px">°F</label>
+    <label>Turf <select id="q_turf"><option value="firm">firm</option><option value="soft">soft</option></select></label>
+    <label>Pin <select id="q_pin"><option>front</option><option>middle</option><option>back</option></select></label>
+    <button id="q_apply">Apply</button>
+  </div>
+  <div class="holes" id="holeStrip" role="tablist" aria-label="Holes"></div>
+</header>
+<main>
+  <section class="hole" id="viewHole">
+    <div>
+      <div class="mapwrap">
+        <canvas id="map" width="420" height="1000" aria-label="Hole aerial with the engine's line and landing pattern"></canvas>
+        <div class="maptools"><button id="gpsBtn" title="Price the shot from where you are standing (uses your device's location)">Where I stand</button><button id="togglePrice" title="Every square yard priced: strokes to hole out from there, on your surfaces and elevation">Price map</button><button id="toggleSurf" title="Show the mapped surfaces the engine prices">Surfaces</button><button id="fixGreen" title="The hole plays to a different green than the map thinks: tap it">Fix green</button><button id="clearTap" style="display:none">Clear</button></div>
+        <div class="maphint" id="mapHint">Tap the map: from here?</div>
+      </div>
+      <div id="attrib" class="maplegend" style="padding-top:4px;padding-bottom:0" hidden><span style="--c:transparent">Imagery © Esri, Maxar, Earthstar Geographics and the GIS user community · map data © OpenStreetMap contributors</span></div>
+      <div class="maplegend">
+        <span style="--c:var(--engine)">engine line &amp; window</span><span style="--c:#ffffff;border:1px solid #999">hole line</span>
+        <span style="--c:var(--fw)">fairway</span><span style="--c:var(--rough)">rough</span><span style="--c:var(--sand)">sand</span><span style="--c:var(--water)">water</span><span style="--c:var(--desert)">desert / penalty</span>
+      </div>
+    </div>
+    <div class="card" id="holeCard"></div>
+  </section>
+  <section class="round" id="viewRound" hidden></section>
+  <section class="audit" id="viewAudit" hidden></section>
+  <section class="settings" id="viewSettings" hidden></section>
+  <section class="pocket" id="pocket"></section>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="data.js"></script>
+<script src="engine.js"></script>
+<script>
+(function(){
+const D = window.LOOP_DATA, E = window.LoopEngine, LIE = E.L, YD = E.YD;
+const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
+const IN_ARTIFACT = !window.LOOP_PHONE && (!!window.claude || /claude\.(ai|com)$/.test(location.hostname));   // the claude.ai copy: no print dialog, no location API
+const LIECOL = {0:"#cdb08a",1:"#6fbf5a",2:"#3f7a3a",3:"#2ecc71",4:"#ead27d",5:"#4f93dd",6:"#9fd9a8",7:"#d9c48f",8:"#a98b5c",9:"#d49ad6"};
+const ODDS = [["fairway","var(--fw)","fairway"],["rough","var(--rough)","rough"],["sand","var(--sand)","sand"],["green","var(--green)","on the green"],["water","var(--water)","water"],["desert","var(--desert)","desert / penalty"]];
+// ---------------- state ----------------
+const store = { get(k, d){ try{ const v = localStorage.getItem("loop."+k); return v==null? d : JSON.parse(v);}catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem("loop."+k, JSON.stringify(v)); }catch(e){} } };
+const state = { overrides: store.get("overrides", {}), fixMode: false, course: store.get("course", D.courses[0].key), hole: store.get("hole", 15), view: "hole", P: Object.assign({}, D.defaults, store.get("P", {})), planClubs: store.get("planClubs", {}), scores: store.get("scores", {}), tap: null, showSurf: false, results: {}, busy: null };
+E.setOverrides(state.overrides);
+// settings keys that live in the engine params
+function course(){ return D.courses.find(c => c.key === state.course) || D.courses[0]; }
+function hole(){ return course().holes.find(h => h.hole === state.hole) || course().holes[0]; }
+function altf(c){ return 1 + state.P.alt_rule/100 * (c.alt_ft - state.P.home_ft)/1000; }
+function planClubFor(c, h){ const o = state.planClubs[c.key+":"+h.hole]; return o === undefined ? h.plan.club : o; }
+function phash(){ const p = state.P; return JSON.stringify([p.setting,p.baseline,p.disp,p.q_miss,p.skew_right,p.wind_mph,p.wind_from,p.temp_f,p.pin,p.alt_rule,p.home_ft,p.lat_pct,p.dist_pct,p.clubsOverride||null,p.penalty,p.scrub_extra,p.short_game_extra||0,p.n]); }
+function fmt(x, d=2){ return x==null||isNaN(x) ? "–" : (+x).toFixed(d); }
+function pct(x){ return x==null ? "–" : Math.round(x*100)+"%"; }
+function sgn(x, d=2){ return x==null ? "–" : (x>0?"+":"")+(+x).toFixed(d); }
+function aimText(a, atYd){ if (a===0) return "straight at the pin line"; const yd = atYd ? Math.round(Math.tan(Math.abs(a)*Math.PI/180)*atYd) : 0; return Math.abs(a)+"° "+(a<0?"left":"right")+(yd?` — about ${yd} yd ${a<0?"left":"right"} of the pin line at ${Math.round(atYd)}`:" of the pin line"); }
+function aimShort(a){ return a===0? "0°" : Math.abs(a)+"° "+(a<0?"L":"R"); }
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("on"), 2600); }
+function windText(){ const p=state.P; if(!(p.wind_mph>0)) return "calm"; const dirs=["N","NE","E","SE","S","SW","W","NW"]; return p.wind_mph+" mph from "+dirs[Math.round(((p.wind_from%360)+360)%360/45)%8]; }
+// ---------------- results (cached per course × settings) ----------------
+function resultKey(c){ return c.key+"|"+phash()+"|"+JSON.stringify(Object.keys(state.planClubs).filter(k=>k.startsWith(c.key+":")).map(k=>[k,state.planClubs[k]])); }
+function getResults(c){ const k = resultKey(c); if (!state.results[k]) state.results[k] = { holes: {}, done: 0 }; return state.results[k]; }
+function compute(c, h, n){ const r = E.runHole(c, h, state.P, { n, planClub: planClubFor(c, h) }); if (r.kind==="tee" && h.par===5 && r.landing && r.approach && r.approach.from >= 160) r.goLay = E.goVsLay(h, r.landing, state.P, altf(c)); return r; }
+function ensureHole(c, h){ const R = getResults(c); if (!R.holes[h.hole] || R.holes[h.hole].n < 1500) { R.holes[h.hole] = compute(c, h, 1500); R.holes[h.hole].n = 1500; } return R.holes[h.hole]; }
+function computeCourse(c, onProgress){
+  const R = getResults(c); if (R.busy) return; R.busy = true; const key = resultKey(c);
+  const todo = c.holes.filter(h => !R.holes[h.hole]);
+  let i = 0;
+  (function step(){
+    if (resultKey(c) !== key) { R.busy = false; return; }   // settings changed; a new cache will be built
+    const t0 = performance.now();
+    while (i < todo.length && performance.now() - t0 < 60) { const h = todo[i++]; R.holes[h.hole] = compute(c, h, 800); R.holes[h.hole].n = 800; }
+    R.done = Object.keys(R.holes).length; onProgress && onProgress(R.done, c.holes.length);
+    if (i < todo.length) setTimeout(step, 0); else { R.busy = false; R.complete = true; onProgress && onProgress(R.done, c.holes.length, true); }
+  })();
+}
+// ---------------- header ----------------
+function renderHeader(){
+  const sel = $("#courseSel"); sel.innerHTML = D.courses.map(c => `<option value="${c.key}" ${c.key===state.course?"selected":""}>${c.club === c.name ? c.name : c.club+" — "+c.name}</option>`).join("");
+  const c = course(); const R = getResults(c);
+  $("#holeStrip").innerHTML = c.holes.map(h => `<button role="tab" aria-current="${h.hole===state.hole}" data-hole="${h.hole}" title="Par ${h.par}, ${h.card} yards">${h.hole}<small>${h.par}·${h.card}</small></button>`).join("");
+  const cur = $("#holeStrip button[aria-current='true']"); if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest", inline: "center" });
+  $("#condChip").innerHTML = `<span>${windText()}</span><span>${state.P.temp_f}°F</span><span>${state.P.setting}</span><span>pin ${state.P.pin}</span>`;
+  $$("nav.views button").forEach(b => b.setAttribute("aria-current", b.dataset.view===state.view ? "page" : "false"));
+}
+// ---------------- map ----------------
+function frameToPx(h, x, y){ const f = h.frame; return [ (y + f.w)/f.res, (f.x1 - x)/f.res ]; }
+const imgCache = {};
+const LIVE_TILES = !!window.LOOP_PHONE;   // the phone build ships no aerials: it draws Esri World Imagery tiles live (with attribution) and caches them
+const TILE_Z = 18, TILE_URL = (z,x,y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+function mercPx(lat, lon, z){ const n = Math.pow(2, z) * 256; return [ (lon + 180) / 360 * n, (1 - Math.log(Math.tan(lat*Math.PI/180) + 1/Math.cos(lat*Math.PI/180)) / Math.PI) / 2 * n ]; }
+function frameToMerc(c, h, x, y){ const f = h.frame; const wx = f.origin[0] + x*f.u[0] + y*f.v[0], wy = f.origin[1] + x*f.u[1] + y*f.v[1]; const [lat0, lon0] = c.origin; return mercPx(lat0 + wy/110574, lon0 + wx/(Math.cos(lat0*Math.PI/180)*111320), TILE_Z); }
+function liveAerial(c, h, onReady){
+  const key = h._key; if (imgCache[key]) return imgCache[key];
+  const f = h.frame; const W = f.W, H = f.H;
+  // affine map canvas pixel → mercator pixel from three corners (the hole frame is a rotated metre grid; mercator is locally affine)
+  const p0 = frameToMerc(c, h, f.x1, -f.w), p1 = frameToMerc(c, h, f.x1, f.w), p2 = frameToMerc(c, h, f.x0, -f.w);
+  const a = (p1[0]-p0[0])/W, b = (p2[0]-p0[0])/H, d = (p1[1]-p0[1])/W, e = (p2[1]-p0[1])/H;   // mx = a*col + b*row + p0x ; my = d*col + e*row + p0y
+  const corners = [p0, p1, p2, frameToMerc(c, h, f.x0, f.w)]; const xs = corners.map(p=>p[0]), ys = corners.map(p=>p[1]);
+  const tx0 = Math.floor(Math.min(...xs)/256), tx1 = Math.floor(Math.max(...xs)/256), ty0 = Math.floor(Math.min(...ys)/256), ty1 = Math.floor(Math.max(...ys)/256);
+  const off = document.createElement("canvas"); off.width = (tx1-tx0+1)*256; off.height = (ty1-ty0+1)*256; const octx = off.getContext("2d"); octx.fillStyle = "#6b6e66"; octx.fillRect(0,0,off.width,off.height);
+  const out = document.createElement("canvas"); out.width = W; out.height = H; const ctx = out.getContext("2d");
+  const det = a*e - b*d; const ia = e/det, ib = -b/det, id = -d/det, ie = a/det;   // inverse: col = ia*(mx-p0x) + ib*(my-p0y); row = id*(...) + ie*(...)
+  const compose = () => { ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H);
+    // canvas = Minv * (merc - p0); merc = off pixel + (tx0*256, ty0*256)
+    const ox = tx0*256 - p0[0], oy = ty0*256 - p0[1];
+    ctx.setTransform(ia, id, ib, ie, ia*ox + ib*oy, id*ox + ie*oy); ctx.drawImage(off, 0, 0); ctx.restore(); obj.ready = true; };
+  const obj = { el: out, ready: false, pending: 0 };
+  for (let tx = tx0; tx <= tx1; tx++) for (let ty = ty0; ty <= ty1; ty++) {
+    const im = new Image(); im.crossOrigin = "anonymous"; obj.pending++;
+    im.onload = () => { octx.drawImage(im, (tx-tx0)*256, (ty-ty0)*256); obj.pending--; compose(); onReady && onReady(); };
+    im.onerror = () => { obj.pending--; if (obj.pending === 0) { compose(); onReady && onReady(); } };
+    im.src = TILE_URL(TILE_Z, tx, ty);
+  }
+  return imgCache[key] = obj;
+}
+function loadImg(h){ const src = "img/"+h.frame.img; if (imgCache[src]) return imgCache[src]; const im = new Image(); im.src = src; imgCache[src] = im; return im; }
+function drawMap(h, r){
+  if (!h || !h.frame) return;
+  const cv = $("#map"), f = h.frame; cv.width = f.W; cv.height = f.H; const ctx = cv.getContext("2d");
+  const c = course(); let im = LIVE_TILES ? null : loadImg(h); let live = null;
+  if (LIVE_TILES || (im && im.complete && !im.naturalWidth)) live = liveAerial(c, h, () => drawMap(h, r));
+  const draw = () => {
+    ctx.clearRect(0,0,cv.width,cv.height);
+    if (live) { if (live.ready) ctx.drawImage(live.el, 0, 0); else { ctx.fillStyle = "#6b6e66"; ctx.fillRect(0,0,cv.width,cv.height); ctx.fillStyle = "#fff"; ctx.font = "14px sans-serif"; ctx.textAlign = "center"; ctx.fillText("Loading the aerial…", cv.width/2, 60); ctx.textAlign = "start"; } }
+    else if (im.complete && im.naturalWidth) ctx.drawImage(im, 0, 0); else { ctx.fillStyle = "#c9b99a"; ctx.fillRect(0,0,cv.width,cv.height); }
+    const px = (x,y) => frameToPx(h,x,y);
+    if (state.showSurf) {
+      const H = E.decodeHole(h); const id = ctx.createImageData(cv.width, cv.height); const d = id.data;
+      for (let row=0; row<cv.height; row++) for (let col=0; col<cv.width; col++) {
+        const x = f.x1 - (row+0.5)*f.res, y = -f.w + (col+0.5)*f.res; const lie = E.lieAt(H, x, y);
+        if (lie===0) continue; const c = LIECOL[lie]; const i=(row*cv.width+col)*4; d[i]=parseInt(c.slice(1,3),16); d[i+1]=parseInt(c.slice(3,5),16); d[i+2]=parseInt(c.slice(5,7),16); d[i+3]=120;
+      }
+      const tmp = document.createElement("canvas"); tmp.width=cv.width; tmp.height=cv.height; tmp.getContext("2d").putImageData(id,0,0); ctx.drawImage(tmp,0,0);
+    }
+    if (state.showPrice) drawPriceMap(ctx, cv, h);
+    // distance arcs from the tee (yardage-book style) for par 4/5
+    if (h.par !== 3) { ctx.save(); ctx.strokeStyle="rgba(255,255,255,.75)"; ctx.setLineDash([4,5]); ctx.lineWidth=1; ctx.font = "bold 12px "+getComputedStyle(document.body).getPropertyValue("--num");
+      for (const yd of [250,275,300,325,350]) { const rpx = yd*YD/f.res; const [cx,cy] = px(0,0); ctx.beginPath(); ctx.arc(cx, cy, rpx, Math.PI*1.15, Math.PI*1.85); ctx.stroke(); ctx.fillStyle="rgba(255,255,255,.9)"; ctx.fillText(String(yd), cx + rpx*Math.cos(Math.PI*1.13)-4, cy + rpx*Math.sin(Math.PI*1.13)+4); }
+      ctx.restore(); }
+    // hole line (its last point follows a moved green)
+    const ovr = E.overrideFor(h); const hline = ovr ? h.line.slice(0, -1).concat([ovr.pin]) : h.line; const pinPt = ovr ? ovr.pin : h.pin;
+    ctx.save(); ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=2; ctx.setLineDash([]); ctx.beginPath(); hline.forEach((p,i)=>{ const [a,b]=px(p[0],p[1]); i?ctx.lineTo(a,b):ctx.moveTo(a,b); }); ctx.stroke(); ctx.restore();
+    // engine pick: aim window fan + line + landing cloud
+    if (r && r.kind==="tee") {
+      const o = r.options[0]; const carryM = o.best.rem!=null ? Math.hypot(r.landing[0], r.landing[1]) : o.total*YD;
+      const fan = (a0,a1,col) => { ctx.beginPath(); const [tx,ty]=px(0,0); ctx.moveTo(tx,ty); for (let a=a0;a<=a1;a+=1){ const rad=a*Math.PI/180; const [qx,qy]=px(Math.cos(rad)*carryM, Math.sin(rad)*carryM); ctx.lineTo(qx,qy);} ctx.closePath(); ctx.fillStyle=col; ctx.fill(); };
+      fan(o.window[0], o.window[1], "rgba(200,16,46,.18)");
+      const rad = o.best.aim*Math.PI/180; const [tx,ty]=px(0,0); const [ex,ey]=px(Math.cos(rad)*carryM, Math.sin(rad)*carryM);
+      ctx.save(); ctx.strokeStyle="#c8102e"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(ex,ey); ctx.stroke(); ctx.restore();
+      for (const s of o.best.sample) { const [a,b]=px(s[0],s[1]); ctx.fillStyle = LIECOL[s[2]] || "#fff"; ctx.beginPath(); ctx.arc(a,b,2.6,0,7); ctx.fill(); ctx.strokeStyle="rgba(0,0,0,.5)"; ctx.lineWidth=.6; ctx.stroke(); }
+      // approach landing cloud (from the median landing point)
+      if (r.approach && r.approach.best && r.approach.best.sample) { const [lx,ly]=px(r.landing[0],r.landing[1]); ctx.save(); ctx.strokeStyle="rgba(200,16,46,.9)"; ctx.setLineDash([6,5]); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(lx,ly); const [qx,qy]=px(pinPt[0],pinPt[1]); ctx.lineTo(qx,qy); ctx.stroke(); ctx.restore();
+        for (const s of r.approach.best.sample) { const [a,b]=px(s[0],s[1]); ctx.fillStyle = LIECOL[s[2]] || "#fff"; ctx.beginPath(); ctx.arc(a,b,2,0,7); ctx.fill(); } }
+    }
+    if (r && r.kind==="par3" && r.approach.best && r.approach.best.sample) { const [tx,ty]=px(0,0); const [qx,qy]=px(pinPt[0],pinPt[1]); ctx.save(); ctx.strokeStyle="#c8102e"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(qx,qy); ctx.stroke(); ctx.restore();
+      for (const s of r.approach.best.sample) { const [a,b]=px(s[0],s[1]); ctx.fillStyle = LIECOL[s[2]] || "#fff"; ctx.beginPath(); ctx.arc(a,b,2.4,0,7); ctx.fill(); ctx.strokeStyle="rgba(0,0,0,.5)"; ctx.lineWidth=.6; ctx.stroke(); } }
+    // tapped point: approach from here
+    if (state.tap && state.tap.res) { const t=state.tap; const [a,b]=px(t.x,t.y); ctx.save(); ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(a,b,7,0,7); ctx.stroke(); ctx.strokeStyle="#2457c5"; ctx.setLineDash([6,5]); ctx.beginPath(); ctx.moveTo(a,b); const [qx,qy]=px(pinPt[0],pinPt[1]); ctx.lineTo(qx,qy); ctx.stroke(); ctx.restore();
+      if (t.res.best && t.res.best.sample) for (const s of t.res.best.sample) { const [c1,c2]=px(s[0],s[1]); ctx.fillStyle = LIECOL[s[2]] || "#fff"; ctx.beginPath(); ctx.arc(c1,c2,2,0,7); ctx.fill(); } }
+    // pin + tee
+    const [qx,qy]=px(pinPt[0],pinPt[1]); ctx.save(); ctx.fillStyle="#fff"; ctx.strokeStyle="#c8102e"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(qx,qy,5,0,7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(qx,qy-5); ctx.lineTo(qx,qy-26); ctx.stroke(); ctx.fillStyle="#c8102e"; ctx.beginPath(); ctx.moveTo(qx,qy-26); ctx.lineTo(qx+12,qy-21); ctx.lineTo(qx,qy-16); ctx.fill();
+    const [tx,ty]=px(0,0); ctx.fillStyle="#fff"; ctx.strokeStyle="#17191c"; ctx.beginPath(); ctx.rect(tx-5,ty-5,10,10); ctx.fill(); ctx.stroke(); ctx.restore();
+    // landing label (median) for the engine pick
+    if (r && r.kind==="tee" && r.landing) { const [lx,ly]=px(r.landing[0],r.landing[1]); ctx.save(); ctx.fillStyle="#c8102e"; ctx.beginPath(); ctx.arc(lx,ly,5,0,7); ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=1.5; ctx.stroke();
+      const lab = Math.round(Math.hypot(r.landing[0], r.landing[1])/YD)+" · "+Math.round(r.options[0].best.rem)+" in"; ctx.font="bold 12px "+getComputedStyle(document.body).getPropertyValue("--num"); const tw = ctx.measureText(lab).width; ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillRect(lx+9, ly-9, tw+10, 18); ctx.fillStyle="#fff"; ctx.fillText(lab, lx+14, ly+4); ctx.restore(); }
+    // wind arrow (where the wind blows TO, in the frame): compass of the frame's +x is the hole bearing
+    if (state.P.wind_mph > 0) { const b = (h.bearing||0); const toDeg = (state.P.wind_from + 180 - b); const rad = toDeg*Math.PI/180; const cx = cv.width-30, cy = 34; ctx.save(); ctx.translate(cx, cy); ctx.rotate(rad); ctx.strokeStyle="#9fe0ff"; ctx.fillStyle="#9fe0ff"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(0,14); ctx.lineTo(0,-12); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(6,-6); ctx.lineTo(-6,-6); ctx.fill(); ctx.restore(); ctx.save(); ctx.fillStyle="#9fe0ff"; ctx.font="bold 11px sans-serif"; ctx.textAlign="center"; ctx.fillText(state.P.wind_mph+" mph", cx, cy+30); ctx.restore(); }
+    // north arrow + scale
+    ctx.save(); const b = (h.bearing||0)*Math.PI/180; const nx = 28, ny = 30; ctx.translate(nx, ny); ctx.rotate(-b); ctx.strokeStyle="#fff"; ctx.fillStyle="#fff"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,14); ctx.lineTo(0,-14); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(5,-6); ctx.lineTo(-5,-6); ctx.fill(); ctx.font="bold 11px sans-serif"; ctx.fillText("N",-4,-19); ctx.restore();
+    const sc = 50*YD/f.res; ctx.save(); ctx.strokeStyle="#fff"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(cv.width-sc-12, cv.height-14); ctx.lineTo(cv.width-12, cv.height-14); ctx.stroke(); ctx.fillStyle="#fff"; ctx.font="bold 11px sans-serif"; ctx.fillText("50 yd", cv.width-sc-12, cv.height-18); ctx.restore();
+  };
+  if (live) draw(); else if (im.complete) draw(); else { im.onload = draw; im.onerror = () => drawMap(h, r); draw(); }
+  if (live) { const at = $("#attrib"); if (at) at.hidden = false; }
+}
+// Price map: strokes to hole out from every 2-yd cell = baseline(lie, plays-like distance) + penalties. Cheap, no simulation.
+const priceCache = {};
+function priceGrid(h){
+  const key = h.frame.img + "|" + state.P.baseline + "|" + state.P.pin + "|" + state.P.penalty + "|" + state.P.scrub_extra;
+  if (priceCache[key]) return priceCache[key];
+  const H = E.decodeHole(h); E.applyPin(H, state.P); const base = state.P.baseline; const fw = E.lut(base,"fairway"), rg = E.lut(base,"rough"), sd = E.lut(base,"sand"), gr = E.lut(base,"green_ft");
+  const A = state.P.angles; const kk = d => 1/Math.tan((d>235?A.wood:d>195?A.long:d>150?A.mid:A.wedge)*Math.PI/180);
+  const vals = new Float32Array(H.nx*H.ny); let mn = 1e9, mx = -1e9;
+  for (let iy=0; iy<H.ny; iy++) for (let ix=0; ix<H.nx; ix++) {
+    const x = H.x0 + (ix+0.5)*H.cell, y = -H.w + (iy+0.5)*H.cell; const lie = H.lie[iy*H.nx+ix]; const r = Math.hypot(x-H.pin[0], y-H.pin[1])/YD; const dz = H.pinFt - E.zAt(H,x,y); let pl = r + kk(r)*dz/3; if (pl<5) pl=5;
+    let v; switch (lie) { case 3: v = E.baseAt(gr, r*3); break; case 1: case 9: v = E.baseAt(fw, pl); break; case 2: case 6: v = E.baseAt(rg, pl); break; case 4: case 7: v = E.baseAt(sd, pl); break; case 8: v = E.baseAt(rg, pl)+state.P.scrub_extra; break; case 5: v = E.baseAt(rg, pl)+1; break; default: v = E.baseAt(rg, pl)+state.P.penalty; }
+    vals[iy*H.nx+ix] = v; if (v<mn) mn=v; if (v>mx) mx=v; }
+  return priceCache[key] = { vals, H, mn, mx };
+}
+function priceColor(t){ // 0 = cheap (deep green) → 1 = dear (dark red), via yellow
+  const stops = [[0,[20,140,70]],[0.35,[180,210,60]],[0.6,[245,190,50]],[0.8,[230,100,40]],[1,[140,20,30]]];
+  for (let i=1;i<stops.length;i++) if (t<=stops[i][0]) { const [t0,c0]=stops[i-1], [t1,c1]=stops[i]; const u=(t-t0)/(t1-t0); return [c0[0]+(c1[0]-c0[0])*u, c0[1]+(c1[1]-c0[1])*u, c0[2]+(c1[2]-c0[2])*u]; }
+  return stops[stops.length-1][1];
+}
+function drawPriceMap(ctx, cv, h){
+  const f = h.frame; const pg = priceGrid(h); const { vals, H } = pg; const id = ctx.createImageData(cv.width, cv.height); const d = id.data;
+  const lo = pg.mn, hi = Math.min(pg.mx, pg.mn + 2.6);
+  for (let row=0; row<cv.height; row++) { const x = f.x1 - (row+0.5)*f.res; const ix = ((x - H.x0)/H.cell)|0; if (ix<0||ix>=H.nx) continue;
+    for (let col=0; col<cv.width; col++) { const y = -f.w + (col+0.5)*f.res; const iy = ((y + H.w)/H.cell)|0; if (iy<0||iy>=H.ny) continue;
+      const v = vals[iy*H.nx+ix]; const t = Math.max(0, Math.min(1, (v-lo)/(hi-lo))); const c = priceColor(t); const i=(row*cv.width+col)*4; d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=165; } }
+  const tmp = document.createElement("canvas"); tmp.width=cv.width; tmp.height=cv.height; tmp.getContext("2d").putImageData(id,0,0); ctx.drawImage(tmp,0,0);
+  // legend
+  ctx.save(); const lw = 120, lh = 10, lx = 12, ly = cv.height - 44; for (let i=0;i<lw;i++){ const c=priceColor(i/lw); ctx.fillStyle=`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; ctx.fillRect(lx+i, ly, 1, lh); }
+  ctx.fillStyle="#fff"; ctx.font="bold 11px sans-serif"; ctx.fillText(lo.toFixed(1)+" strokes to hole out", lx, ly-4); ctx.textAlign="right"; ctx.fillText(hi.toFixed(1)+"+", lx+lw, ly+lh+12); ctx.restore();
+}
+$("#togglePrice").addEventListener("click", () => { state.showPrice = !state.showPrice; $("#togglePrice").style.fontWeight = state.showPrice? "700":"400"; if (!hole().nodata) drawMap(hole(), getResults(course()).holes[state.hole]); });
+$("#map").addEventListener("click", ev => {
+  const h = hole(); if (h.nodata) return; const cv = ev.currentTarget; const rect = cv.getBoundingClientRect();
+  // canvas is object-fit: contain inside its box — compute the drawn area
+  const scale = Math.min(rect.width / cv.width, rect.height / cv.height); const dw = cv.width*scale, dh = cv.height*scale; const ox = (rect.width-dw)/2, oy = (rect.height-dh)/2;
+  const col = (ev.clientX - rect.left - ox)/scale, row = (ev.clientY - rect.top - oy)/scale; if (col<0||row<0||col>cv.width||row>cv.height) return;
+  const f = h.frame; const x = f.x1 - row*f.res, y = -f.w + col*f.res;
+  if (state.fixMode) { setGreen(h, x, y); return; }
+  priceFrom(x, y, "tapped");
+});
+function setGreen(h, x, y){
+  // snap to the mapped green polygon under the tap, else the nearest one within 30 m, else a 12-yd disc at the tap
+  let poly = null, best = 1e9; const gs = h.polys.greens || [];
+  gs.forEach((p, i) => { if (E.pointInPoly(x, y, p)) { poly = i; best = 0; } });
+  if (poly == null) gs.forEach((p, i) => { const cx = p.reduce((s,q)=>s+q[0],0)/p.length, cy = p.reduce((s,q)=>s+q[1],0)/p.length; const d = Math.hypot(cx-x, cy-y); if (d < 30 && d < best) { best = d; poly = i; } });
+  let pin = [x, y]; if (poly != null) { const p = gs[poly]; pin = [p.reduce((s,q)=>s+q[0],0)/p.length, p.reduce((s,q)=>s+q[1],0)/p.length]; }
+  state.overrides[h._key] = { pin: [Math.round(pin[0]*10)/10, Math.round(pin[1]*10)/10], poly, latlon: frameToLatLon(course(), h, pin) };
+  store.set("overrides", state.overrides); E.setOverrides(state.overrides); state.results = {}; state.tap = null; setFixMode(false);
+  renderHole(); startBackground(); toast(poly != null ? "Green moved to the mapped green you tapped. Reset it from the map tools." : "Green moved to the tapped point (12-yd disc; no mapped green there). Reset it from the map tools.");
+}
+function clearGreen(h){ delete state.overrides[h._key]; store.set("overrides", state.overrides); E.setOverrides(state.overrides); state.results = {}; renderHole(); startBackground(); toast("Green reset to the map's own."); }
+function frameToLatLon(c, h, p){ const f = h.frame; const wx = f.origin[0] + p[0]*f.u[0] + p[1]*f.v[0], wy = f.origin[1] + p[0]*f.u[1] + p[1]*f.v[1]; const [lat0, lon0] = c.origin; return [Math.round((lat0 + wy/110574)*1e6)/1e6, Math.round((lon0 + wx/(Math.cos(lat0*Math.PI/180)*111320))*1e6)/1e6]; }
+function setFixMode(on){ state.fixMode = on; const hint = $("#mapHint"); hint.classList.toggle("fix", on); hint.textContent = on ? "Fix green: tap the green this hole really plays to (tap Fix green again to cancel)" : "Tap the map: from here?"; $("#fixGreen").style.fontWeight = on ? "700" : "400"; }
+$("#fixGreen").addEventListener("click", () => { const h = hole(); if (h.nodata) return; if (state.fixMode) { setFixMode(false); return; } if (E.overrideFor(h)) { clearGreen(h); return; } setFixMode(true); });
+$("#clearTap").addEventListener("click", () => { state.tap = null; $("#clearTap").style.display = "none"; renderHole(); });
+function priceFrom(x, y, label){ const h = hole(); const res = E.approach(h, [x,y], state.P, altf(course()), { n: 1200 }); const gl = res.from >= 160 ? E.goVsLay(h, [x,y], state.P, altf(course())) : null; state.tap = { x, y, res, gl, label }; $("#clearTap").style.display = ""; renderHole();
+  if (res.best) toast(`From ${Math.round(res.from)}: ${res.club}, on ${pct(res.best.odds.green)}, ${fmt(res.best.E)} to hole out${gl && gl.delta!=null ? (gl.delta>0 ? " · go saves "+fmt(gl.delta) : " · lay up saves "+fmt(-gl.delta)) : ""}`);
+  const fh = $("#fromHere"); if (fh && window.innerWidth <= 860) { const top = fh.getBoundingClientRect().top + window.scrollY - document.querySelector("header").offsetHeight - 8; window.scrollTo({ top, behavior: "smooth" }); } }
+function locateMe(){
+  if (!navigator.geolocation) { toast("This browser has no location service."); return; }
+  const btn = $("#gpsBtn"); btn.textContent = "Locating…"; btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(pos => {
+    btn.textContent = "Where I stand"; btn.disabled = false;
+    const c = course(), h = hole(); if (!h.frame) return;
+    const [lat0, lon0] = c.origin; const wx = (pos.coords.longitude - lon0) * Math.cos(lat0*Math.PI/180) * 111320, wy = (pos.coords.latitude - lat0) * 110574;
+    const f = h.frame; const dx = wx - f.origin[0], dy = wy - f.origin[1]; const x = dx*f.u[0] + dy*f.u[1], y = dx*f.v[0] + dy*f.v[1];
+    // on this hole? (inside the frame, with some slack)
+    if (x < f.x0 - 60 || x > f.x1 + 60 || Math.abs(y) > f.w + 60) {
+      // find the hole whose frame contains the point
+      let bestH = null, bestD = 1e9;
+      for (const hh of c.holes) { if (!hh.frame) continue; const g = hh.frame; const ddx = wx - g.origin[0], ddy = wy - g.origin[1]; const xx = ddx*g.u[0] + ddy*g.u[1], yy = ddx*g.v[0] + ddy*g.v[1]; const d = Math.max(0, g.x0 - xx, xx - g.x1) + Math.max(0, Math.abs(yy) - g.w); if (d < bestD) { bestD = d; bestH = hh; } }
+      if (bestH && bestD < 150 && bestH.hole !== h.hole) { state.hole = bestH.hole; store.set("hole", state.hole); renderHeader(); toast("You are on hole " + bestH.hole + "."); setTimeout(locateMeAt, 50, wx, wy); return; }
+      toast("Your position is " + Math.round(Math.hypot(dx, dy)/YD) + " yards from this hole's tee — not on " + c.name + " as mapped. Pick the course you are on."); return;
+    }
+    priceFrom(x, y, "GPS ±" + Math.round(pos.coords.accuracy) + " m");
+  }, err => { btn.textContent = "Where I stand"; btn.disabled = false; toast(err.code === 1 ? "Location permission was refused." : "Could not get a position (" + err.message + ")."); }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 });
+}
+function locateMeAt(wx, wy){ const h = hole(); const f = h.frame; const dx = wx - f.origin[0], dy = wy - f.origin[1]; priceFrom(dx*f.u[0] + dy*f.u[1], dx*f.v[0] + dy*f.v[1], "GPS"); }
+$("#gpsBtn").addEventListener("click", locateMe);
+$("#toggleSurf").addEventListener("click", () => { state.showSurf = !state.showSurf; $("#toggleSurf").style.fontWeight = state.showSurf? "700":"400"; if (!hole().nodata) drawMap(hole(), getResults(course()).holes[state.hole]); });
+// ---------------- hole card ----------------
+function oddsBar(od, cls="odds"){ return `<div class="${cls}">${ODDS.map(([k,c])=>`<i style="width:${(od[k]||0)*100}%;background:${c}" title="${k} ${pct(od[k])}"></i>`).join("")}</div>`; }
+function oddsLabels(od){ return `<div class="oddsl">${ODDS.filter(([k])=>od[k]>=0.005).map(([k,c,l])=>`<span style="--c:${c}">${l} ${pct(od[k])}</span>`).join("")}</div>`; }
+function verdictChip(v){ if(!v) return ""; const m = {confirmed:["ok","elevation call confirmed"],corrected:["bad","elevation call corrected"],new:["new","elevation the plan missed"],noted:["","elevation noted"],quiet:["","no elevation call"],flat:["","flat"],noplan:["","no written plan"]}[v]||["",v]; return `<span class="chip ${m[0]}">${m[1]}</span>`; }
+function profileFor(h){
+  const ovr = E.overrideFor(h); if (!ovr) return h.profile;
+  const H = E.decodeHole(h); const pts = h.line.slice(0, -1).concat([ovr.pin]); const s = [], z = []; let cum = 0;
+  for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i+1]; const L = Math.hypot(b[0]-a[0], b[1]-a[1]); const n = Math.max(1, Math.round(L/2)); for (let k = 0; k < n; k++) { const t = k/n; s.push(Math.round(cum + t*L)); z.push(E.zAt(H, a[0]+t*(b[0]-a[0]), a[1]+t*(b[1]-a[1]))); } cum += L; }
+  s.push(Math.round(cum)); z.push(E.zAt(H, ovr.pin[0], ovr.pin[1])); return { s, ft: z };
+}
+function profileSvg(h, r){
+  const pr = profileFor(h); const s = pr.s, z = pr.ft; const W=600, Hh=110, pad=28; const L = s[s.length-1]; const zmin=Math.min(...z), zmax=Math.max(...z); const span=Math.max(20, zmax-zmin);
+  const X = v => pad + v/L*(W-2*pad), Y = v => 8 + (1 - (v-zmin)/span)*(Hh-30);
+  let d = ""; for (let i=0;i<s.length;i++) d += (i?"L":"M")+X(s[i]).toFixed(1)+" "+Y(z[i]).toFixed(1)+" ";
+  const area = d + `L${X(L).toFixed(1)} ${Hh-10} L${X(0)} ${Hh-10} Z`;
+  let land = ""; if (r && r.landing) { const sx = Math.hypot(r.landing[0], r.landing[1]); const zi = interpProfile(h, sx); land = `<line x1="${X(sx).toFixed(1)}" y1="${Y(zi).toFixed(1)}" x2="${X(sx).toFixed(1)}" y2="${Hh-10}" stroke="var(--engine)" stroke-width="2" stroke-dasharray="4 3"/><circle cx="${X(sx).toFixed(1)}" cy="${Y(zi).toFixed(1)}" r="3.5" fill="var(--engine)"/><text x="${X(sx).toFixed(1)}" y="${(Y(zi)-7).toFixed(1)}" font-size="11" fill="var(--engine)" text-anchor="middle" font-family="var(--num)">lands ${Math.round(sx/YD)} · ${Math.round(zi - z[0])>0?"+":""}${Math.round(zi - z[0])} ft</text>`; }
+  return `<svg class="profile" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" role="img" aria-label="Elevation profile along the hole">
+    <path d="${area}" fill="var(--panel2)"/><path d="${d}" fill="none" stroke="var(--ink2)" stroke-width="1.5"/>${land}
+    <text x="${pad}" y="${Hh-13}" font-size="11" fill="var(--mute)" font-family="var(--num)">tee ${Math.round(z[0])} ft</text>
+    <text x="${W-pad}" y="${Hh-13}" font-size="11" fill="var(--mute)" text-anchor="end" font-family="var(--num)">green ${Math.round(z[z.length-1])} ft (${sgn(z[z.length-1]-z[0],0)})</text>
+    <text x="${W-pad}" y="14" font-size="11" fill="var(--mute)" text-anchor="end" font-family="var(--num)">low ${Math.round(zmin)} · high ${Math.round(zmax)}</text></svg>`;
+}
+function interpProfile(h, sx){ const pr = profileFor(h); const s=pr.s, z=pr.ft; for (let i=1;i<s.length;i++) if (s[i]>=sx){ const t=(sx-s[i-1])/((s[i]-s[i-1])||1); return z[i-1]+t*(z[i]-z[i-1]); } return z[z.length-1]; }
+function renderHole(){
+  const c = course(), h = hole(); const card = $("#holeCard");
+  if (h.nodata) { card.innerHTML = `<h1>Hole ${h.hole}<span class="meta">Par ${h.par} · ${h.card} yards${h.si?` · SI ${h.si}`:""}</span></h1><p class="empty">This hole has no measured line yet (it sits outside the course's OpenStreetMap outline), so there is nothing to simulate. The plan's notes are below.</p>${planBlock(c,h,null)}`;
+    const cv = $("#map"); cv.width = 420; cv.height = 300; const ctx = cv.getContext("2d"); ctx.fillStyle = "#2a2d31"; ctx.fillRect(0,0,420,300); ctx.fillStyle = "#9aa0a6"; ctx.font = "15px sans-serif"; ctx.textAlign = "center"; ctx.fillText("No aerial: this hole has no measured line", 210, 150); return; }
+  const r = ensureHole(c, h); drawMap(h, r);
+  const ovr = E.overrideFor(h); $("#fixGreen").textContent = state.fixMode ? "Cancel" : ovr ? "Reset green" : "Fix green"; $("#fixGreen").style.fontWeight = state.fixMode ? "700" : "400";
+  const A = r.approach; let html = store.get("hintSeen", false) ? "" : `<div class="hint noprint"><span>The red line is the engine's tee shot for your pattern on this ground; the dots are where it lands. Tap the map to ask “from here?”. <b>Plan audit</b> lists where the data argues with the written plan.</span><button id="hintOk">Got it</button></div>`;
+  html += `<h1>Hole ${h.hole}<span class="meta">Par ${h.par} · ${h.card} yards · SI ${h.si||"–"} · plays ${(h.bearing!=null)?compass(h.bearing):""} · ${sgn(h.pin_ft - h.tee_ft,0)} ft tee to green</span></h1>`;
+  // the answer to "from here?" comes first, so a phone sees it right under the map
+  if (state.tap && state.tap.res) { const t = state.tap, a = t.res;
+    html += `<div class="shot fromhere" id="fromHere" style="border-color:var(--plan)"><div class="E num">${a.best?fmt(a.best.E):"–"}<small>to hole out</small></div><div class="big">${a.best?a.club:"No shot"}<small>from ${t.label && t.label.startsWith("GPS") ? "where you stand" : "the tapped point"}: ${Math.round(a.from)} yd, plays ${Math.round(a.plays)} (${sgn(a.dz,0)} ft)</small></div>
+      <div style="color:var(--ink2);font-size:13.5px;margin-top:4px">${lieName(a.fromLie).replace(/^from /,"From ")}${a.fromPen?`, a stroke and a drop first`:""}${a.shortBy>2?` — ${Math.round(a.shortBy)} yd short even with the longest club`:""}${a.best?` · curve says ${fmt(a.curveFairway)} from the fairway`:""}</div>
+      ${a.best ? oddsBar(a.best.odds)+oddsLabels(a.best.odds) : ""}
+      ${t.gl && t.gl.go.best ? `<div class="rows"><div><span>Go for it ${t.gl.go.club}</span><span><b>${fmt(t.gl.go.best.E)}</b> · on ${pct(t.gl.go.best.odds.green)}</span></div><div><span>Lay up to ${t.gl.lay?t.gl.lay.leave:"–"}${t.gl.lay?" · "+t.gl.lay.club:""}</span><span><b>${t.gl.lay?fmt(t.gl.lay.E):"–"}</b>${t.gl.delta!=null?` · ${t.gl.delta>0?"going saves "+fmt(t.gl.delta):"laying up saves "+fmt(-t.gl.delta)}`:""}</span></div></div>` : ""}
+      <div style="margin-top:8px"><button id="clearTap2" style="padding:3px 10px;font-size:12.5px">Clear</button></div></div>`; }
+  if (r.kind === "tee") {
+    const o = r.options[0], b = o.best; const plan = planClubFor(c,h);
+    const landYd = r.landing ? Math.hypot(r.landing[0], r.landing[1])/YD : o.total;
+    html += `<div class="shot"><div class="E num">${fmt(r.E)}<small>strokes expected</small></div><div class="big">${o.club}<small>${aimText(b.aim, landYd)}</small></div>
+      <div style="color:var(--ink2);font-size:13.5px;margin-top:2px">${Math.round(o.carry)} carry, ${Math.round(o.total)} total here (${c.alt_ft.toLocaleString()} ft${state.P.wind_mph>0?", "+windText():""})</div>
+      <div style="color:var(--ink2);font-size:13.5px;margin-top:4px">Window ${aimShort(o.window[0])} to ${aimShort(o.window[1])} costs under 0.05${o.straight?` · straight at the pin line ${fmt(o.straight.E)}`:` · scanned around the fairway's own line (${aimShort(o.aim0)})`}</div>
+      ${oddsBar(b.odds)}${oddsLabels(b.odds)}
+      <div class="rows">
+        <div><span>Leaves</span><span><b>${Math.round(b.rem)}</b> yd, plays <b>${Math.round(b.plays)}</b> (${sgn(A?A.dz:0,0)} ft)</span></div>
+        ${A && A.best ? `<div><span>Then ${A.club} ${lieName(A.fromLie)} into the green</span><span>on <b>${pct(A.best.odds.green)}</b> · sand ${pct(A.best.odds.sand)} · water ${pct(A.best.odds.water)} · <b>${fmt(A.best.E)}</b> to hole out</span></div>` : ""}
+        ${r.planE!=null && plan && plan!==o.club ? `<div><span>The plan's ${plan}</span><span>best line ${aimShort(r.planAim)} · <b>${fmt(r.planE)}</b> · costs <b style="color:var(--engine)">${sgn(r.planE - r.E)}</b> a hole</span></div>` : r.planE!=null && plan ? `<div><span>The plan's ${plan}</span><span>agrees with the engine</span></div>` : ""}
+      </div></div>`;
+    if (r.goLay && r.goLay.go.best) { const g = r.goLay; const goWin = g.delta!=null && g.delta>0;
+      html += `<h2>Second shot from ${Math.round(g.R)} yards</h2><div class="go">
+        <div class="${goWin?"win":""}"><div class="lbl">Go for it · ${g.go.club}</div><div class="v num">${fmt(g.go.best.E)}</div><div class="d">on ${pct(g.go.best.odds.green)} · sand ${pct(g.go.best.odds.sand)} · water ${pct(g.go.best.odds.water)} · penalty ${pct(g.go.best.odds.desert)}</div></div>
+        <div class="${!goWin&&g.lay?"win":""}"><div class="lbl">Lay up to ${g.lay?g.lay.leave:"–"} · ${g.lay?g.lay.club:""}</div><div class="v num">${g.lay?fmt(g.lay.E):"–"}</div><div class="d">${g.lay?`fairway ${pct(g.lay.shares.fairway)} · trouble ${pct((g.lay.shares.sand||0)+(g.lay.shares.water||0)+(g.lay.shares.desert||0))}, then a wedge`:"no lay-up that reaches"}</div></div></div>
+        <div style="font-size:13.5px;color:var(--ink2);margin-top:-6px">${g.delta!=null ? (goWin ? `Going saves <b>${fmt(g.delta)}</b> strokes here.` : `Laying up saves <b>${fmt(-g.delta)}</b> strokes here.`) : ""} Tap the map to price the second shot from anywhere else.</div>`; }
+  } else if (r.kind === "par3") {
+    const a = r.approach;
+    html += `<div class="shot"><div class="E num">${fmt(r.E)}<small>strokes expected</small></div><div class="big">${a.club}<small>plays ${Math.round(a.plays)} (${sgn(a.dz,0)} ft)</small></div>
+      ${a.best ? oddsBar(a.best.odds)+oddsLabels(a.best.odds) : `<div style="color:var(--mute);font-size:13.5px;margin-top:8px">No green surfaces are mapped here, so the number is the scratch curve for a ${Math.round(a.plays)}-yard shot, not a simulation.</div>`}
+      ${a.best ? `<div class="rows"><div><span>Best target</span><span>${a.best.lat===0?"at the pin":Math.abs(a.best.lat)+" yd "+(a.best.lat<0?"left":"right")}${a.best.depth?", "+Math.abs(a.best.depth)+" yd "+(a.best.depth<0?"short":"long"):""} · median ${Math.round(a.best.prox)} ft from the hole</span></div>
+      <div><span>Curve from this distance</span><span>fairway lie <b>${fmt(a.curveFairway)}</b></span></div></div>`:""}</div>`;
+  } else if (r.kind === "gated") {
+    html += `<div class="shot" style="border-color:var(--mute)"><div class="big" style="font-size:22px">Tee shot not priced</div><div style="color:var(--ink2);margin-top:6px">OpenStreetMap has no fairway for this hole and the imagery is not green enough to read one, so the engine will not invent the surfaces. The elevation and the plan still apply.</div></div>`;
+  }
+  html += `<h2>Elevation (USGS lidar)</h2>${profileSvg(h, r)}`;
+  html += planBlock(c, h, r);
+  if (r.kind === "tee") {
+    html += `<h2>Every tee option</h2><div class="tablewrap"><table><thead><tr><th>Club</th><th class="n">Total</th><th>Aim</th><th>Window</th><th class="n">Expected</th><th>Where it lands</th><th class="n">Leaves</th><th class="n">Plays</th></tr></thead><tbody>`;
+    for (const o of r.options) { const b=o.best; html += `<tr class="${o===r.options[0]?"pick":""}"><td>${o.club}${planClubFor(c,h)===o.club?` <span class="chip" style="background:var(--plan);color:#fff">plan</span>`:""}</td><td class="n">${Math.round(o.total)}</td><td>${aimShort(b.aim)}</td><td>${aimShort(o.window[0])}–${aimShort(o.window[1])}</td><td class="n"><b>${fmt(b.E)}</b></td><td><span class="mini">${ODDS.map(([k,cc])=>`<i style="width:${(b.odds[k]||0)*100}%;background:${cc}"></i>`).join("")}</span> <span style="font-size:12px;color:var(--mute)">fw ${pct(b.odds.fairway)} · trouble ${pct((b.odds.desert||0)+(b.odds.water||0)+(b.odds.sand||0))}</span></td><td class="n">${Math.round(b.rem)}</td><td class="n">${Math.round(b.plays)}</td></tr>`; }
+    html += `</tbody></table></div>`;
+  }
+  html += `<div class="src">${ovr ? `<b>Green moved by you</b> (${ovr.poly != null ? "to a mapped green" : "to a tapped point, 12-yd disc"}; the elevation profile, the line and every number follow it; this correction lives in this browser — Settings → Corrections has it as text for the rebuild). ` : ""}Surfaces: fairway from ${h.src.fairway==="osm"?"OpenStreetMap":h.src.fairway==="imagery"?"the aerial imagery":"nowhere (unpriced)"}, green from ${h.src.green==="osm"?"OpenStreetMap":h.src.green==="imagery"?"the aerial imagery":"a 12-yard disc at the line end"}${h.src.sand?`, sand from ${h.src.sand.replace("+"," and ")}`:""}. Elevation: ${(c.lidar&&c.lidar.title)||"USGS 3DEP"}. Dispersion: ${state.P.clubsOverride?"your launch-monitor table":"the calibrated 3-handicap model"} at ${Math.round(state.P.disp*100)}%, ${Math.round(state.P.q_miss*100)}% mishits, ${state.P.baseline} baseline. Desert and water cost a stroke and a drop; the numbers compare options and are not a score prediction.</div>`;
+  card.innerHTML = html;
+  const ct2 = $("#clearTap2"); if (ct2) ct2.addEventListener("click", () => { state.tap = null; $("#clearTap").style.display = "none"; renderHole(); });
+  const ho = $("#hintOk"); if (ho) ho.addEventListener("click", () => { store.set("hintSeen", true); ho.parentElement.remove(); });
+  $$(".planclub").forEach(sel => sel.addEventListener("change", ev => { state.planClubs[c.key+":"+h.hole] = ev.target.value || null; store.set("planClubs", state.planClubs); state.results = {}; renderHole(); }));
+}
+function lieName(l){ return ({0:"from the desert",1:"from the fairway",2:"from the rough",3:"from the green",4:"from the sand",5:"from the water",6:"from another green",7:"from the waste area",8:"from the scrub",9:"from the tee"})[l] || ""; }
+function dataQuality(c){
+  const hs = c.holes.filter(h=>!h.nodata); const fwOsm = hs.filter(h=>h.src.fairway==="osm").length, fwImg = hs.filter(h=>h.src.fairway==="imagery").length, fwNone = hs.filter(h=>h.src.fairway==="none").length;
+  const grOsm = hs.filter(h=>h.src.green==="osm").length, grImg = hs.filter(h=>h.src.green==="imagery").length, grDisc = hs.filter(h=>h.src.green==="disc").length;
+  const inv = c.inventory || {}; const parts = [];
+  parts.push(`fairways: ${fwOsm} holes from OpenStreetMap${fwImg?`, ${fwImg} read from imagery`:""}${fwNone?`, ${fwNone} unpriced`:""}`);
+  parts.push(`greens: ${grOsm} mapped${grImg?`, ${grImg} from imagery`:""}${grDisc?`, ${grDisc} as a 12-yd disc`:""}`);
+  parts.push(`bunkers: ${inv.bunkers||0} mapped${(inv.bunkers||0)<12?" (the rest read from imagery where they sit in turf)":""}`);
+  parts.push(`water: ${inv.water||0} mapped`);
+  let verdict = fwOsm >= 12 && grOsm >= 12 && (inv.bunkers||0) >= 20 ? "well mapped — trust the hazard odds" : fwNone >= 4 ? "thin map — several holes cannot be priced" : "mixed sources — trust the lines and the elevation, read the hazard odds with the map open";
+  return { text: parts.join(" · "), verdict };
+}
+function compass(b){ const d=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"]; return d[Math.round(b/22.5)%16]+" ("+Math.round(b)+"°)"; }
+function planBlock(c, h, r){
+  const p = h.plan; if (!c.has_plan) return `<h2>The written plan</h2><div class="plan" style="border-color:var(--mute);color:var(--mute)">No game plan has been written for ${c.name} yet. The engine's numbers stand alone here.</div>`;
+  const clubSel = h.par!==3 && !h.nodata ? `<label style="font-size:12.5px;color:var(--mute)">Plan's tee club <select class="planclub" style="padding:2px 6px;border:1px solid var(--rule);border-radius:5px;background:var(--paper)"><option value="">(none)</option>${D.tee_clubs.map(n=>`<option ${planClubFor(c,h)===n?"selected":""}>${n}</option>`).join("")}</select></label>` : "";
+  return `<h2>The written plan</h2><div class="plan"><div class="say">${p.summary ? esc(p.summary) : "The plan has no notes for this hole."}</div>
+    <div class="vs">${verdictChip(p.verdict)}${p.confidence?`<span class="chip" title="Omega session B's map confidence for this hole">map ${p.confidence}</span>`:""}${clubSel}</div>
+    ${p.verdict_note?`<p>Lidar: ${esc(p.verdict_note)}</p>`:""}
+    ${p.line?`<p>Plan line: ${esc(p.line)}</p>`:""}
+    ${h.lab && h.lab.rows && h.lab.rows.length ? `<p>Lab go/lay-up run (Omega E, ${h.lab.green_src}): ${h.lab.rows.slice(0,4).map(x=>`from ${x.R}: go ${fmt(x.go_E)} vs lay ${fmt(x.lay_E)} (${sgn(x.delta)})`).join("; ")}.</p>`:""}
+    ${p.text && p.text.length ? `<details><summary>Read the plan's full notes</summary>${p.text.map(t=>`<p>${esc(t)}</p>`).join("")}</details>`:""}</div>`;
+}
+function esc(s){ return String(s).replace(/[&<>]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
+// ---------------- round view ----------------
+function renderRound(){
+  const c = course(); const R = getResults(c); const el = $("#viewRound");
+  const rows = c.holes.map(h => ({ h, r: R.holes[h.hole] }));
+  const done = rows.filter(x=>x.r).length;
+  let engE=0, planE=0, nPlan=0, nE=0, parE=0;
+  for (const {h,r} of rows) { if (!r || r.E==null) continue; engE += r.E; nE++; parE += h.par; if (r.planE!=null) { planE += r.planE - r.E; nPlan++; } }
+  let html = `<h1 style="font-family:var(--num);font-size:28px;margin:4px 0 2px">${c.club === c.name ? c.name : c.club+" — "+c.name}<span style="display:block;font:14px var(--font);color:var(--ink2);margin-top:4px">${c.tees} · par ${c.par} · ${c.yards.toLocaleString()} yards · ${c.alt_ft.toLocaleString()} ft · ${c.city}</span></h1>`;
+  const dq = dataQuality(c);
+  html += `<div class="progress">${done<c.holes.length?`Pricing the course… ${done} of ${c.holes.length} holes`:`All ${c.holes.length} holes priced under today's settings (${windText()}, ${state.P.temp_f}°F, ${state.P.setting}, pin ${state.P.pin}).`} Map: <b>${dq.verdict}</b> — ${dq.text}.</div>`;
+  html += `<div class="kpis"><div class="kpi engine"><div class="v num">${nE?fmt(engE,1):"–"}</div><div class="l">model strokes on the ${nE} priced holes (par ${parE}) playing the engine's lines</div></div>
+    <div class="kpi plan"><div class="v num">${nPlan?sgn(planE,1):"–"}</div><div class="l">what the plan's tee clubs cost per round where they differ (${nPlan} holes with a plan club)</div></div>
+    <div class="kpi"><div class="v num">${rows.filter(x=>x.r&&x.r.goLay&&x.r.goLay.delta>0.1).length}</div><div class="l">par 5s where going for the green beats laying up by more than 0.1</div></div></div>`;
+  html += IN_ARTIFACT ? `<div class="noprint" style="margin:0 0 10px;font-size:12.5px;color:var(--mute)">The pocket card (one printable page per course) prints from the copy in Documents\\Claude\\The Forge\\Loop.</div>` : `<div class="noprint" style="margin:0 0 10px"><button id="printPocket">Print the pocket card</button> <span style="font-size:12.5px;color:var(--mute)">one page: club, line, plays-like and the call for every hole</span></div>`;
+  html += `<div class="tablewrap"><table><thead><tr><th class="n">Hole</th><th class="n">Par</th><th class="n">Yards</th><th>Tee shot</th><th class="n">Expected</th><th>Plan's club</th><th class="n">Costs</th><th class="n">Leaves · plays</th><th>Approach</th><th>Second shot</th><th class="n">Your score</th></tr></thead><tbody>`;
+  for (const {h,r} of rows) {
+    const sc = state.scores[c.key+":"+h.hole] || "";
+    if (!r) { html += `<tr><td class="n">${h.hole}</td><td class="n">${h.par}</td><td class="n">${h.card}</td><td colspan="7" style="color:var(--mute)">${h.nodata?"no measured line":"…"}</td><td class="n"><input class="score" data-hole="${h.hole}" value="${sc}" style="width:44px;text-align:right;padding:2px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)" inputmode="numeric"></td></tr>`; continue; }
+    let tee="", app="", sec="", plan="", cost="", leaves="";
+    if (r.kind==="tee") { const o=r.options[0], b=o.best; tee=`<b>${o.club}</b> ${aimShort(b.aim)}`; leaves=`${Math.round(b.rem)} · ${Math.round(b.plays)}`; const pc=planClubFor(c,h); plan = pc?`<span style="color:var(--plan)">${pc}</span>`:"–"; cost = r.planE!=null && pc!==o.club ? `<span style="color:var(--engine)">${sgn(r.planE-r.E)}</span>` : (pc?"agrees":"–");
+      if (r.approach&&r.approach.best) app=`${r.approach.club}, on ${pct(r.approach.best.odds.green)}`;
+      if (r.goLay&&r.goLay.go.best) sec = r.goLay.delta>0.05?`<b>go</b> (${sgn(r.goLay.delta)})`: r.goLay.delta!=null?`lay up to ${r.goLay.lay.leave} (${sgn(-r.goLay.delta)})`:"–"; }
+    else if (r.kind==="par3") { const a=r.approach; tee=`<b>${a.club}</b>`; leaves=`plays ${Math.round(a.plays)}`; app = a.best && !r.curveOnly ?`on ${pct(a.best.odds.green)}`:"curve only"; }
+    else tee = `<span style="color:var(--mute)">not priced</span>`;
+    html += `<tr><td class="n"><a href="#" data-gohole="${h.hole}" style="font-weight:600">${h.hole}</a></td><td class="n">${h.par}</td><td class="n">${h.card}</td><td>${tee}</td><td class="n"><b>${fmt(r.E)}</b></td><td>${plan}</td><td class="n">${cost}</td><td class="n">${leaves}</td><td>${app}</td><td>${sec}</td><td class="n"><input class="score" data-hole="${h.hole}" value="${sc}" style="width:44px;text-align:right;padding:2px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)" inputmode="numeric"></td></tr>`;
+  }
+  const scored = rows.filter(x=>x.r&&x.r.E!=null&&+state.scores[c.key+":"+x.h.hole]>0);
+  const vsModel = scored.reduce((s,x)=>s+(+state.scores[c.key+":"+x.h.hole]-x.r.E),0);
+  html += `</tbody><tfoot><tr><td class="tot" colspan="4">Totals</td><td class="n tot">${nE?fmt(engE,1):"–"}</td><td></td><td class="n tot" style="color:var(--engine)">${nPlan?sgn(planE,1):""}</td><td colspan="3" style="color:var(--mute);font-size:12.5px">${scored.length?`Your ${scored.length} entered scores run ${sgn(vsModel,1)} against the model on those holes.`:"Enter hole scores after a round to see where you ran above or below the model."}</td><td class="n tot">${scored.length?scored.reduce((s,x)=>s+ +state.scores[c.key+":"+x.h.hole],0):""}</td></tr></tfoot></table></div>`;
+  html += `<p class="src">Model strokes use the ${state.P.baseline} strokes-to-hole-out curve after the simulated shots; they compare strategies and will not match your scoring average. Holes without mapped fairways are left out of the totals.</p>`;
+  el.innerHTML = html;
+  $$("[data-gohole]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); state.hole = +a.dataset.gohole; store.set("hole", state.hole); setView("hole"); }));
+  $$(".score").forEach(i => i.addEventListener("change", ev => { const v = ev.target.value.trim(); const k = c.key+":"+ev.target.dataset.hole; if (v==="") delete state.scores[k]; else state.scores[k] = +v; store.set("scores", state.scores); renderRound(); }));
+  const pb = $("#printPocket"); if (pb) pb.addEventListener("click", () => { renderPocket(); window.print(); });
+}
+function renderPocket(){
+  const c = course(); const R = getResults(c); let html = `<h1>${c.club} — ${c.name} · ${c.tees}</h1><div class="sub">Loop pocket card · ${windText()}, ${state.P.temp_f}°F, ${state.P.setting}, pin ${state.P.pin} · generated ${new Date().toLocaleDateString()}</div><table><thead><tr><th>#</th><th>Par</th><th>Yds</th><th>Tee</th><th>Line</th><th>Then</th><th>Call</th><th>Plan says</th></tr></thead><tbody>`;
+  for (const h of c.holes) { const r = R.holes[h.hole]; let tee="–", line="", then="", call="";
+    if (r && r.kind==="tee") { const o=r.options[0]; tee=o.club; const ly = r.landing ? Math.round(Math.tan(Math.abs(o.best.aim)*Math.PI/180)*Math.hypot(r.landing[0],r.landing[1])/YD) : 0; line=aimShort(o.best.aim)+(ly?" ≈ "+ly+" yd "+(o.best.aim<0?"L":"R"):"")+" (win "+aimShort(o.window[0])+"–"+aimShort(o.window[1])+")"; then=`${Math.round(o.best.rem)} → plays ${Math.round(o.best.plays)}${r.approach?", "+r.approach.club:""}`; if (r.goLay&&r.goLay.delta!=null) call = r.goLay.delta>0.05?`go (+${fmt(r.goLay.delta)})`:`lay up ${r.goLay.lay.leave}`; }
+    else if (r && r.kind==="par3") { tee=r.approach.club; then=`plays ${Math.round(r.approach.plays)} (${sgn(r.approach.dz,0)} ft)`; }
+    html += `<tr><td>${h.hole}</td><td>${h.par}</td><td>${h.card}</td><td>${tee}</td><td>${line}</td><td>${then}</td><td>${call}</td><td>${h.plan.summary?esc(h.plan.summary.replace(/^Hole \d+ — [^.]*\. ?/,"")).slice(0,110):""}</td></tr>`; }
+  $("#pocket").innerHTML = html + `</tbody></table>`;
+}
+// ---------------- audit view ----------------
+function breakEven(c, h, engClub, planClub){
+  // how much wider would the pattern have to be before the plan's club wins? sweep the dispersion scale
+  const P0 = state.P; const scales = [1.2, 1.4, 1.6, 1.9];
+  for (const sc of scales) { const P = Object.assign({}, P0, { disp: sc, n: 500 }); const opts = E.teeOptions(h, P, altf(c), { n: 500, keep: 0, clubs: [engClub, planClub] }); if (opts[0].club === planClub) return `The plan's ${planClub} wins only if your pattern is about ${Math.round((sc-1)*100)}% wider than the model (dispersion ${Math.round(sc*100)}%).`; }
+  return `The plan's ${planClub} does not win even with a pattern 90% wider than the model.`;
+}
+function renderAudit(){
+  const c = course(); const R = getResults(c); const el = $("#viewAudit"); const items = [];
+  for (const h of c.holes) { const r = R.holes[h.hole]; const p = h.plan;
+    if (r && r.kind==="tee") { const pc = planClubFor(c,h); if (pc && r.planE!=null && pc !== r.options[0].club && r.planE - r.E >= 0.04) {
+        const be = breakEven(c, h, r.options[0].club, pc);
+        items.push({ imp: r.planE - r.E, hole: h.hole, where: `Hole ${h.hole}: the plan tees off with ${pc}; the engine prefers ${r.options[0].club} ${aimShort(r.options[0].best.aim)}`, ev: `${pc} ${fmt(r.planE)} vs ${r.options[0].club} ${fmt(r.E)} expected strokes. ${be}${p.confidence==="C"?" Map confidence C: the plan's reasoning may rest on something the map does not show.":p.confidence==="B"?" Map confidence B: one named feature in the plan is unmapped.":""} ${p.club_src&&!/Omega/.test(p.club_src)?"The plan's club was "+p.club_src+" — correct it on the hole page if that reading is wrong.":""}` }); }
+      if (r.goLay && r.goLay.delta != null && r.goLay.delta > 0.15 && r.goLay.lay) {
+        const txt = (p.summary||"") + " " + (p.text||[]).join(" "); const m = txt.match(/[^.]*\b(no-go|lay(?:ing|s)?[ -]?up|go in two|reachable|go for)\b[^.]*\./i);
+        const saysLay = /\bno-go\b|\blay(?:ing|s)?[ -]?up\b/i.test((p.summary||"").split(".").slice(0,3).join(".")) && !/go in two is on|clean go|conditional go/i.test(p.summary||"");
+        items.push({ imp: r.goLay.delta, hole: h.hole, where: `Hole ${h.hole}: going for the green from ${Math.round(r.goLay.R)} beats laying up${saysLay?" — the plan says lay up":""}`, ev: `Go ${fmt(r.goLay.go.best.E)} (on ${pct(r.goLay.go.best.odds.green)}, sand ${pct(r.goLay.go.best.odds.sand)}, water ${pct(r.goLay.go.best.odds.water)}, penalty ${pct(r.goLay.go.best.odds.desert)}) vs lay up to ${r.goLay.lay.leave} ${fmt(r.goLay.lay.E)} from the engine's landing spot. ${m?`Plan: “${m[0].trim()}”`:"The plan does not call the second shot."} The lay-up wins only if your wedge and short game run well below scratch; judge the surfaces on the map.` }); } }
+    if (p.verdict === "corrected") items.push({ imp: 0.0, hole: h.hole, where: `Hole ${h.hole}: the plan's elevation call is the wrong direction`, ev: p.verdict_note || "", elev: true });
+    if (p.verdict === "new" && p.verdict_note) items.push({ imp: 0.0, hole: h.hole, where: `Hole ${h.hole}: ${sgn(h.pin_ft-h.tee_ft,0)} ft tee to green that the plan does not mention`, ev: p.verdict_note, elev: true });
+  }
+  items.sort((a,b)=> (b.imp-a.imp) || (a.hole-b.hole));
+  let html = `<h1 style="font-family:var(--num);font-size:28px;margin:4px 0 2px">Plan audit — ${c.name}</h1><p style="color:var(--ink2);max-width:70ch">Every place the data disagrees with the written plan: tee clubs the engine prices differently, lay-ups that cost strokes, and elevation calls the lidar contradicts or the plan never made. Stroke impacts are per hole under today's settings.</p>`;
+  const dq = dataQuality(c); html += `<div class="progress">Map: <b>${dq.verdict}</b> — ${dq.text}.</div>`;
+  if (!c.has_plan) html += `<p class="empty">No written plan exists for ${c.name}; there is nothing to audit. The Round view carries the engine's own calls.</p>`;
+  else if (!R.complete) html += `<div class="progress">Pricing the course… ${Object.keys(R.holes).length} of ${c.holes.length} holes. The list fills in as holes finish.</div>`;
+  html += `<ul>` + (items.length ? items.map(it => `<li><span class="imp">${it.imp>0?sgn(it.imp):""}</span><div class="where"><a href="#" data-gohole="${it.hole}">${it.where}</a></div><div class="ev">${esc(it.ev)}</div></li>`).join("") : (R.complete && c.has_plan ? `<li class="empty">Nothing to argue with: the plan and the data agree on every priced hole.</li>` : "")) + `</ul>`;
+  el.innerHTML = html;
+  $$("#viewAudit [data-gohole]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); state.hole = +a.dataset.gohole; store.set("hole", state.hole); setView("hole"); }));
+}
+// ---------------- settings ----------------
+function renderSettings(){
+  const P = state.P; const el = $("#viewSettings");
+  const clubs = D.clubs.map(c => { const o = (P.clubsOverride||[]).find(x=>x.name===c.name) || {}; return Object.assign({}, c, o); });
+  el.innerHTML = `
+  <section><h3>Today's conditions</h3>
+    <label>Wind speed (mph) <input type="number" id="s_wind_mph" min="0" max="40" step="1" value="${P.wind_mph}"></label>
+    <label>Wind from (compass °) <input type="number" id="s_wind_from" min="0" max="359" step="5" value="${P.wind_from}"></label>
+    <label>Temperature (°F) <input type="number" id="s_temp_f" min="30" max="120" step="1" value="${P.temp_f}"></label>
+    <label>Turf <select id="s_setting"><option value="firm" ${P.setting==="firm"?"selected":""}>firm</option><option value="soft" ${P.setting==="soft"?"selected":""}>soft (overseed)</option></select></label>
+    <label>Pin position <select id="s_pin"><option ${P.pin==="front"?"selected":""}>front</option><option ${P.pin==="middle"?"selected":""}>middle</option><option ${P.pin==="back"?"selected":""}>back</option></select></label>
+    <p class="help">Wind is a caddie's rule of thumb: ${P.head_pct_per_mph}% of carry per mph into, ${P.tail_pct_per_mph}% per mph with, ${P.cross_yd_per_mph} yd of drift per mph across for a 300-yard shot. Every hole uses its own bearing.</p>
+  </section>
+  <section><h3>You</h3>
+    <label>Dispersion scale <input type="range" id="s_disp" min="0.6" max="1.6" step="0.05" value="${P.disp}"> <span class="num" id="s_disp_v">${Math.round(P.disp*100)}%</span></label>
+    <label>Mishit rate <input type="range" id="s_q_miss" min="0.1" max="0.6" step="0.05" value="${P.q_miss}"> <span class="num" id="s_q_miss_v">${Math.round(P.q_miss*100)}%</span></label>
+    <label>Fade bias (right-side stretch) <input type="range" id="s_skew_right" min="0" max="0.6" step="0.05" value="${P.skew_right}"> <span class="num" id="s_skew_v">${Math.round(P.skew_right*100)}%</span></label>
+    <label>Home elevation (ft) <input type="number" id="s_home_ft" step="10" value="${P.home_ft}"></label>
+    <label>Short game vs scratch <select id="s_short_game_extra"><option value="0" ${P.short_game_extra==0?"selected":""}>scratch (57% up-and-down)</option><option value="0.2" ${P.short_game_extra==0.2?"selected":""}>+0.2 strokes a chip</option><option value="0.4" ${P.short_game_extra==0.4?"selected":""}>+0.4</option><option value="0.6" ${P.short_game_extra==0.6?"selected":""}>+0.6</option><option value="0.8" ${P.short_game_extra==0.8?"selected":""}>+0.8</option></select></label>
+    <label>Baseline curve <select id="s_baseline"><option value="scratch" ${P.baseline==="scratch"?"selected":""}>scratch amateur</option><option value="tour" ${P.baseline==="tour"?"selected":""}>PGA Tour (Broadie)</option></select></label>
+    <label>Desert costs <select id="s_penalty"><option value="1" ${P.penalty==1?"selected":""}>a stroke and a drop (local rule)</option><option value="0.5" ${P.penalty==0.5?"selected":""}>half a stroke (often playable)</option><option value="0" ${P.penalty==0?"selected":""}>nothing beyond a rough lie</option></select></label>
+    <p class="help">Dispersion at 100% is the model calibrated to Arccos scratch-golfer green hits (83/71/63/47/36% from 100/130/150/200/240 yards); a 3-handicap sits a little wider, try 110%. The short-game setting adds strokes to every chip, pitch and bunker shot inside 50 yards — it is the one number the go/lay-up verdicts turn on.</p>
+  </section>
+  <section><h3>Your clubs</h3>
+    <table class="clubs"><thead><tr><th>Club</th><th class="n">Carry</th><th class="n">Roll firm</th><th class="n">Roll soft</th></tr></thead><tbody>
+    ${clubs.map(c => `<tr><td>${c.name}</td><td class="n"><input type="number" data-club="${c.name}" data-f="carry" value="${c.carry}"></td><td class="n"><input type="number" data-club="${c.name}" data-f="roll_firm" value="${c.roll_firm}"></td><td class="n"><input type="number" data-club="${c.name}" data-f="roll_soft" value="${c.roll_soft}"></td></tr>`).join("")}
+    </tbody></table>
+    <p class="help">Carries at sea level and 70°F; Loop adds ${P.alt_rule}% per 1,000 ft of course elevation above home and ${P.temp_pct_per_10f}% per 10°F. <button id="resetClubs" style="padding:2px 8px;font-size:12px">Reset to the model</button></p>
+  </section>
+  <section><h3>Launch monitor</h3>
+    <textarea id="lmPaste" placeholder="Paste one club per line: club, carry, total  — or  club, carry, total, offline σ (yd), distance σ (yd)
+Driver, 302, 328
+3-wood, 274, 296, 15, 10"></textarea>
+    <div style="margin-top:8px"><button id="lmApply">Use these numbers</button> <span class="help" style="display:inline">Carry and roll replace the table; a σ pair also replaces that club's dispersion. Names must match the table.</span></div>
+    <p class="help">${P.clubsOverride?`Using your table for ${P.clubsOverride.length} clubs.`:"Using the model's club table."}</p>
+  </section>
+  <section><h3>Corrections</h3>
+    <p class="help">Greens you moved with <b>Fix green</b>, as text for the rebuild: paste into <code>pipeline/overrides.json</code> (merge by course and hole) and run <code>run_all.py</code>; the aerial is then re-framed on the right green and the yardage book's pin can be fixed from the same numbers.</p>
+    <textarea id="corrections" readonly>${esc(JSON.stringify(correctionsJson(), null, 1))}</textarea>
+    <p class="help"><button id="clearCorrections">Forget all corrections</button></p>
+  </section>
+  <section><h3>Engine</h3>
+    <label>Shots per option <select id="s_n"><option ${P.n==800?"selected":""}>800</option><option ${P.n==1500?"selected":""}>1500</option><option ${P.n==3000?"selected":""}>3000</option></select></label>
+    <label>Aim scan ± degrees <input type="number" id="s_aim_max" min="10" max="40" step="2" value="${P.aim_max}"></label>
+    <p class="help">Results are deterministic for a given setting (the same random draws every time), so small differences between options are real differences in the model, not noise between runs.</p>
+    <p class="help"><button id="resetAll">Reset every setting</button> <button id="clearScores">Clear entered scores</button></p>
+  </section>`;
+  const bind = (id, key, parse=parseFloat) => { const e = $("#"+id); e.addEventListener("change", () => { state.P[key] = parse(e.value); if (key==="aim_max") state.P.aim_min = -state.P.aim_max; saveP(); renderSettings(); }); };
+  bind("s_wind_mph","wind_mph"); bind("s_wind_from","wind_from"); bind("s_temp_f","temp_f"); bind("s_setting","setting",v=>v); bind("s_pin","pin",v=>v); bind("s_home_ft","home_ft"); bind("s_baseline","baseline",v=>v); bind("s_short_game_extra","short_game_extra"); bind("s_penalty","penalty"); bind("s_n","n",v=>parseInt(v,10)); bind("s_aim_max","aim_max",v=>parseInt(v,10));
+  for (const [id,key,disp] of [["s_disp","disp","s_disp_v"],["s_q_miss","q_miss","s_q_miss_v"],["s_skew_right","skew_right","s_skew_v"]]) { const e=$("#"+id); e.addEventListener("input", ()=>{ $("#"+disp).textContent = Math.round(e.value*100)+"%"; }); e.addEventListener("change", ()=>{ state.P[key]=parseFloat(e.value); saveP(); }); }
+  $$(".clubs input").forEach(i => i.addEventListener("change", () => { const ov = state.P.clubsOverride ? state.P.clubsOverride.slice() : []; let o = ov.find(x=>x.name===i.dataset.club); if (!o) { const base = D.clubs.find(c=>c.name===i.dataset.club); o = Object.assign({}, base); ov.push(o); } o[i.dataset.f] = parseFloat(i.value); state.P.clubsOverride = ov; saveP(); }));
+  $("#resetClubs").addEventListener("click", () => { delete state.P.clubsOverride; saveP(); renderSettings(); });
+  $("#lmApply").addEventListener("click", () => { const lines = $("#lmPaste").value.split(/\n+/).map(l=>l.trim()).filter(Boolean); const ov = state.P.clubsOverride ? state.P.clubsOverride.slice() : []; let n=0, bad=[];
+    for (const ln of lines) { const parts = ln.split(/[,\t;]+/).map(s=>s.trim()); const name = D.clubs.find(c=>c.name.toLowerCase()===parts[0].toLowerCase().replace(/^3w$/,"3-wood").replace(/^(\d)i$/,"$1-iron").replace(/^d(river)?$/,"driver"));
+      if (!name || parts.length<3 || isNaN(+parts[1]) || isNaN(+parts[2])) { bad.push(ln); continue; }
+      let o = ov.find(x=>x.name===name.name); if (!o) { o = Object.assign({}, name); ov.push(o); }
+      o.carry = +parts[1]; const roll = Math.max(0, +parts[2] - +parts[1]); o.roll_firm = Math.round(roll); o.roll_soft = Math.round(roll*0.4);
+      if (parts.length>=5 && !isNaN(+parts[3]) && !isNaN(+parts[4])) { o.lat_pct = +parts[3]/o.carry; o.dist_pct = +parts[4]/o.carry; }
+      n++; }
+    if (n) { state.P.clubsOverride = ov; saveP(); } toast(n ? `Applied ${n} club${n>1?"s":""}${bad.length?`; could not read ${bad.length} line${bad.length>1?"s":""}`:""}.` : "Nothing applied — each line needs club, carry, total."); renderSettings(); });
+  $("#clearCorrections").addEventListener("click", () => { state.overrides = {}; store.set("overrides", state.overrides); E.setOverrides({}); state.results = {}; renderSettings(); toast("Corrections forgotten."); });
+  $("#resetAll").addEventListener("click", () => { state.P = Object.assign({}, D.defaults); saveP(); renderSettings(); toast("Settings reset."); });
+  $("#clearScores").addEventListener("click", () => { state.scores = {}; store.set("scores", state.scores); toast("Scores cleared."); });
+}
+function correctionsJson(){ const out = {}; for (const k in state.overrides) { const [ck, hn] = k.split(":"); const o = state.overrides[k]; (out[ck] = out[ck] || {})[hn] = { green_latlon: o.latlon, note: "moved in Loop on " + new Date().toISOString().slice(0,10) }; } return out; }
+function saveP(){ const keep = {}; for (const k in state.P) if (JSON.stringify(state.P[k]) !== JSON.stringify(D.defaults[k])) keep[k] = state.P[k]; store.set("P", keep); state.results = {}; renderHeader(); if (state.view==="hole") renderHole(); startBackground(); }
+// ---------------- views ----------------
+function setView(v){ state.view = v; for (const id of ["hole","round","audit","settings"]) $("#view"+id[0].toUpperCase()+id.slice(1)).hidden = id!==v; renderHeader();
+  if (v==="hole") renderHole(); if (v==="round") renderRound(); if (v==="audit") renderAudit(); if (v==="settings") renderSettings(); if (v==="round"||v==="audit") startBackground(); window.scrollTo(0,0); }
+function startBackground(){ const c = course(); computeCourse(c, (done, total, complete) => { if (state.view==="round") renderRound(); if (state.view==="audit") renderAudit(); }); }
+$("#condChip").addEventListener("click", () => { const q = $("#quick"); const open = q.hidden; q.hidden = !open; $("#condChip").setAttribute("aria-expanded", String(open)); if (open) { $("#q_wind").value = state.P.wind_mph; $("#q_from").value = state.P.wind_from; $("#q_temp").value = state.P.temp_f; $("#q_turf").value = state.P.setting; $("#q_pin").value = state.P.pin; } });
+$("#q_apply").addEventListener("click", () => { state.P.wind_mph = +$("#q_wind").value || 0; state.P.wind_from = +$("#q_from").value || 0; state.P.temp_f = +$("#q_temp").value || 75; state.P.setting = $("#q_turf").value; state.P.pin = $("#q_pin").value; $("#quick").hidden = true; $("#condChip").setAttribute("aria-expanded","false"); saveP(); toast("Conditions applied: " + windText() + ", " + state.P.temp_f + "°F, " + state.P.setting + ", pin " + state.P.pin); });
+$("#courseSel").addEventListener("change", ev => { state.course = ev.target.value; store.set("course", state.course); state.hole = 1; store.set("hole", 1); state.tap = null; renderHeader(); setView(state.view); startBackground(); });
+$("#holeStrip").addEventListener("click", ev => { const b = ev.target.closest("button[data-hole]"); if (!b) return; state.hole = +b.dataset.hole; store.set("hole", state.hole); state.tap = null; setFixMode(false); $("#clearTap").style.display="none"; renderHeader(); if (state.view!=="hole") setView("hole"); else renderHole(); });
+$$("nav.views button").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
+document.addEventListener("keydown", ev => { if (ev.target.matches("input,select,textarea")) return; if (ev.key==="ArrowRight"||ev.key==="ArrowLeft") { const c=course(); const i = c.holes.findIndex(h=>h.hole===state.hole); const j = Math.max(0, Math.min(c.holes.length-1, i + (ev.key==="ArrowRight"?1:-1))); state.hole = c.holes[j].hole; store.set("hole", state.hole); state.tap=null; renderHeader(); if (state.view==="hole") renderHole(); } });
+// boot
+if (IN_ARTIFACT || !navigator.geolocation) { $("#gpsBtn").style.display = "none"; }
+renderHeader(); setView("hole"); startBackground();
+})();
+</script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});</script>
+</body>
+</html>
