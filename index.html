@@ -35,7 +35,9 @@ button:hover{border-color:var(--ink2)}
 button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--engine);outline-offset:2px}
 a{color:inherit}
 .num{font-family:var(--num);font-variant-numeric:tabular-nums;letter-spacing:.01em}
-header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--rule)}
+/* The header sticks at 0 and owns the status-bar band itself: padding = the safe-area inset, painted dark so the clock reads in both themes.
+   Sticking at top:env(...) instead left the stuck header 59 px below its layout slot on a home-screen app, covering the map's tool row. */
+header{position:sticky;top:0;z-index:5;padding-top:env(safe-area-inset-top,0px);background:var(--paper);background:linear-gradient(to bottom,#173d26 env(safe-area-inset-top,0px),var(--paper) 0);border-bottom:1px solid var(--rule)}
 .bar{display:flex;align-items:center;gap:14px;padding:10px 16px;flex-wrap:wrap}
 .wordmark{font-family:var(--num);font-weight:700;font-size:22px;letter-spacing:.02em;margin-right:4px}
 .wordmark small{display:block;font:12px/1.2 var(--font);color:var(--mute);font-weight:400;letter-spacing:0}
@@ -62,15 +64,19 @@ main{padding:14px 16px 60px;max-width:1500px;margin:0 auto}
 .hole>*{min-width:0}
 .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 @media (max-width:860px){.hole{grid-template-columns:minmax(0,1fr)}.bar{gap:10px}nav.views{margin-left:0;width:100%}nav.views button{flex:1}}
-.mapwrap{position:relative;background:var(--panel);border-radius:10px;overflow:hidden}
-.mapwrap canvas{display:block;width:100%;height:auto;cursor:crosshair}
+.mapwrap{position:relative;background:var(--panel);border-radius:10px;overflow:clip} /* clip, not hidden: hidden would make the map the tool row's scroll container and stop it sticking */
+.mapwrap canvas{display:block;width:100%;height:auto;cursor:crosshair;border-radius:10px}
 .maplegend{display:flex;flex-wrap:wrap;gap:10px 14px;padding:8px 10px;font-size:12px;color:var(--ink2)}
 .maplegend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--c)}
-.maptools{position:absolute;top:8px;right:8px;display:flex;gap:6px}
-.maptools button{background:rgba(255,255,255,.88);color:#17191c;border-color:transparent;font-size:12px;padding:4px 8px;backdrop-filter:blur(4px)}
-.maphint{position:absolute;left:8px;top:44px;font-size:12px;color:#fff;background:rgba(0,0,0,.55);padding:4px 8px;border-radius:6px;max-width:70%}
+/* The tool row and hint ride along the bottom of the screen while the (tall) aerial scrolls: a zero-height sticky strip at the end of the map,
+   its content stacked upward from the bottom edge, never leaving the map (thumb reach on a phone; the green at the top stays uncovered). */
+.maptop{position:sticky;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:2;height:0;margin:0 8px;display:flex;flex-direction:column;align-items:flex-end;justify-content:flex-end;gap:6px;pointer-events:none}
+.maptop>*{pointer-events:auto}
+.maptools{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.maptools button{background:rgba(255,255,255,.9);color:#17191c;border-color:transparent;font-size:12px;padding:4px 8px;backdrop-filter:blur(4px);touch-action:manipulation;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.maphint{font-size:12px;color:#fff;background:rgba(0,0,0,.6);padding:4px 8px;border-radius:6px;max-width:85%}
 .maphint.fix{background:var(--plan);font-size:13px;font-weight:600}
-@media (max-width:560px){.maptools{flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 16px)}.maphint{top:46px}}
+@media (pointer:coarse){.maptools button{font-size:13px;padding:8px 9px}.maphint{font-size:13px;padding:6px 10px}}
 .card h1{font-family:var(--num);font-weight:700;font-size:30px;line-height:1.05;margin:0}
 .card h1 .meta{font:15px/1.3 var(--font);font-weight:400;color:var(--ink2);display:block;margin-top:6px}
 .shot{margin:18px 0 10px;padding:16px 18px;border-left:4px solid var(--engine);background:var(--panel);border-radius:0 10px 10px 0}
@@ -133,6 +139,7 @@ tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
 .settings textarea{width:100%;height:120px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);padding:8px;font:13px/1.4 ui-monospace,Consolas,monospace}
 .settings .help{font-size:12.5px;color:var(--mute);margin:6px 0 0}
 .clubs td input{width:58px;padding:3px 6px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);text-align:right}
+@media (max-width:560px){.clubs th,.clubs td{padding:5px 4px}.clubs td input{width:50px;padding:3px 4px}.clubs{font-size:13px}}
 .progress{font-size:12.5px;color:var(--mute);margin:4px 0 10px}
 .empty{padding:40px;text-align:center;color:var(--mute)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:8px;font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
@@ -179,8 +186,10 @@ tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
     <div>
       <div class="mapwrap">
         <canvas id="map" width="420" height="1000" aria-label="Hole aerial with the engine's line and landing pattern"></canvas>
-        <div class="maptools"><button id="gpsBtn" title="Price the shot from where you are standing (uses your device's location)">Where I stand</button><button id="togglePrice" title="Every square yard priced: strokes to hole out from there, on your surfaces and elevation">Price map</button><button id="toggleSurf" title="Show the mapped surfaces the engine prices">Surfaces</button><button id="fixGreen" title="The hole plays to a different green than the map thinks: tap it">Fix green</button><button id="clearTap" style="display:none">Clear</button></div>
-        <div class="maphint" id="mapHint">Tap the map: from here?</div>
+        <div class="maptop">
+          <div class="maphint" id="mapHint">Tap the map: from here?</div>
+          <div class="maptools"><button id="gpsBtn" title="Price the shot from where you are standing (uses your device's location)">Where I stand</button><button id="togglePrice" title="Every square yard priced: strokes to hole out from there, on your surfaces and elevation">Price map</button><button id="toggleSurf" title="Show the mapped surfaces the engine prices">Surfaces</button><button id="fixGreen" title="The hole plays to a different green than the map thinks: tap it">Fix green</button><button id="clearTap" style="display:none">Clear</button></div>
+        </div>
       </div>
       <div id="attrib" class="maplegend" style="padding-top:4px;padding-bottom:0" hidden><span style="--c:transparent">Imagery © Esri, Maxar, Earthstar Geographics and the GIS user community · map data © OpenStreetMap contributors</span></div>
       <div class="maplegend">
@@ -616,9 +625,9 @@ function renderSettings(){
     <p class="help">Dispersion at 100% is the model calibrated to Arccos scratch-golfer green hits (83/71/63/47/36% from 100/130/150/200/240 yards); a 3-handicap sits a little wider, try 110%. The short-game setting adds strokes to every chip, pitch and bunker shot inside 50 yards — it is the one number the go/lay-up verdicts turn on.</p>
   </section>
   <section><h3>Your clubs</h3>
-    <table class="clubs"><thead><tr><th>Club</th><th class="n">Carry</th><th class="n">Roll firm</th><th class="n">Roll soft</th></tr></thead><tbody>
+    <div class="tablewrap"><table class="clubs"><thead><tr><th>Club</th><th class="n">Carry</th><th class="n">Roll firm</th><th class="n">Roll soft</th></tr></thead><tbody>
     ${clubs.map(c => `<tr><td>${c.name}</td><td class="n"><input type="number" data-club="${c.name}" data-f="carry" value="${c.carry}"></td><td class="n"><input type="number" data-club="${c.name}" data-f="roll_firm" value="${c.roll_firm}"></td><td class="n"><input type="number" data-club="${c.name}" data-f="roll_soft" value="${c.roll_soft}"></td></tr>`).join("")}
-    </tbody></table>
+    </tbody></table></div>
     <p class="help">Carries at sea level and 70°F; Loop adds ${P.alt_rule}% per 1,000 ft of course elevation above home and ${P.temp_pct_per_10f}% per 10°F. <button id="resetClubs" style="padding:2px 8px;font-size:12px">Reset to the model</button></p>
   </section>
   <section><h3>Launch monitor</h3>
