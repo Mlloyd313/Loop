@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the seven courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="e56ea7d8f8">
+<meta name="loop-build" content="c64c7b3650">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -484,6 +484,11 @@ function renderHole(){
         <div class="${goWin?"win":""}"><div class="lbl">Go for it · ${g.go.club}</div><div class="v num">${fmt(g.go.best.E)}</div><div class="d">on ${pct(g.go.best.odds.green)} · sand ${pct(g.go.best.odds.sand)} · water ${pct(g.go.best.odds.water)} · penalty ${pct(g.go.best.odds.desert)}</div></div>
         <div class="${!goWin&&g.lay?"win":""}"><div class="lbl">Lay up to ${g.lay?g.lay.leave:"–"} · ${g.lay?g.lay.club:""}</div><div class="v num">${g.lay?fmt(g.lay.E):"–"}</div><div class="d">${g.lay?`fairway ${pct(g.lay.shares.fairway)} · trouble ${pct((g.lay.shares.sand||0)+(g.lay.shares.water||0)+(g.lay.shares.desert||0))}, then a wedge`:"no lay-up that reaches"}</div></div></div>
         <div style="font-size:13.5px;color:var(--ink2);margin-top:-6px">${g.delta!=null ? (goWin ? `Going saves <b>${fmt(g.delta)}</b> strokes here.` : `Laying up saves <b>${fmt(-g.delta)}</b> strokes here.`) : ""} Tap the map to price the second shot from anywhere else.</div>`; }
+    else if (r.goLay && r.goLay.lay) { const g = r.goLay;
+      html += `<h2>Second shot from ${Math.round(g.R)} yards</h2><div class="go">
+        <div><div class="lbl">Go for it</div><div class="v num">–</div><div class="d">out of reach: ${Math.round(g.go.shortBy)} yd more than your longest club carries today</div></div>
+        <div class="win"><div class="lbl">Lay up to ${g.lay.leave} · ${g.lay.club}</div><div class="v num">${fmt(g.lay.E)}</div><div class="d">fairway ${pct(g.lay.shares.fairway)} · trouble ${pct((g.lay.shares.sand||0)+(g.lay.shares.water||0)+(g.lay.shares.desert||0))}, then a wedge</div></div></div>
+        <div style="font-size:13.5px;color:var(--ink2);margin-top:-6px">A three-shot hole from here${g.lays.length>1?`; the other leaves price ${g.lays.slice(1).map(l=>l.leave+" at "+fmt(l.E)).join(", ")}`:""}. Tap the map to price the second shot from anywhere else.</div>`; }
   } else if (r.kind === "par3") {
     const a = r.approach;
     html += `<div class="shot"><div class="E num">${fmt(r.E)}<small>strokes expected</small></div><div class="big">${a.club}<small>plays ${Math.round(a.plays)} (${sgn(a.dz,0)} ft)</small></div>
@@ -551,7 +556,8 @@ function renderRound(){
     let tee="", app="", sec="", plan="", cost="", leaves="";
     if (r.kind==="tee") { const o=r.options[0], b=o.best; tee=`<b>${o.club}</b> ${aimShort(b.aim)}`; leaves=`${Math.round(b.rem)} · ${Math.round(b.plays)}`; const pc=planClubFor(c,h); plan = pc?`<span style="color:var(--plan)">${pc}</span>`:"–"; cost = r.planE!=null && pc!==o.club ? `<span style="color:var(--engine)">${sgn(r.planE-r.E)}</span>` : (pc?"agrees":"–");
       if (r.approach&&r.approach.best) app=`${r.approach.club}, on ${pct(r.approach.best.odds.green)}`;
-      if (r.goLay&&r.goLay.go.best) sec = r.goLay.delta>0.05?`<b>go</b> (${sgn(r.goLay.delta)})`: r.goLay.delta!=null?`lay up to ${r.goLay.lay.leave} (${sgn(-r.goLay.delta)})`:"–"; }
+      if (r.goLay&&r.goLay.go.best) sec = r.goLay.delta>0.05?`<b>go</b> (${sgn(r.goLay.delta)})`: r.goLay.delta!=null?`lay up to ${r.goLay.lay.leave} (${sgn(-r.goLay.delta)})`:"–";
+      else if (r.goLay&&r.goLay.lay) sec = `out of reach · lay up to ${r.goLay.lay.leave}`; }
     else if (r.kind==="par3") { const a=r.approach; tee=`<b>${a.club}</b>`; leaves=`plays ${Math.round(a.plays)}`; app = a.best && !r.curveOnly ?`on ${pct(a.best.odds.green)}`:"curve only"; }
     else tee = `<span style="color:var(--mute)">not priced</span>`;
     html += `<tr><td class="n"><a href="#" data-gohole="${h.hole}" style="font-weight:600">${h.hole}</a></td><td class="n">${h.par}</td><td class="n">${h.card}</td><td>${tee}</td><td class="n"><b>${fmt(r.E)}</b></td><td>${plan}</td><td class="n">${cost}</td><td class="n">${leaves}</td><td>${app}</td><td>${sec}</td><td class="n"><input class="score" data-hole="${h.hole}" value="${sc}" style="width:44px;text-align:right;padding:2px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)" inputmode="numeric"></td></tr>`;
