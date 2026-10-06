@@ -1,4 +1,5 @@
-# Deploys the Loop phone build to GitHub Pages on every push to main (and enables Pages the first time).
+# Deploys the Loop phone build to GitHub Pages on every push to main. Pages itself must be enabled once by the owner
+# (Settings -> Pages -> Source: GitHub Actions); GitHub does not let the workflow's token create the site.
 name: Deploy to GitHub Pages
 on:
   push:
@@ -20,8 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
