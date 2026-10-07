@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="c8466b8497">
+<meta name="loop-build" content="ebcf41ba19">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -916,7 +916,10 @@ function swingFigure(pose, name){
   let g = SW_BONES.filter(([a, b]) => ok(a) && ok(b)).map(([a, b]) => `<line x1="${p[a][0]}" y1="${p[a][1]}" x2="${p[b][0]}" y2="${p[b][1]}" stroke="${col(a, b)}"/>`).join("");
   const head = ok(3) && ok(4) ? [(p[3][0] + p[4][0]) / 2, (p[3][1] + p[4][1]) / 2] : ok(0) ? p[0] : null; if (head) g += `<circle cx="${head[0].toFixed(3)}" cy="${head[1].toFixed(3)}" r="0.045" fill="none" stroke="var(--ink2)"/>`;
   if (ok(9) && ok(10)) g += `<circle cx="${((p[9][0] + p[10][0]) / 2).toFixed(3)}" cy="${((p[9][1] + p[10][1]) / 2).toFixed(3)}" r="0.022" fill="var(--ink)"/>`;
-  return `<figure><svg viewBox="-0.06 -0.06 1.12 1.12" preserveAspectRatio="xMidYMid meet" role="img" aria-label="stick figure at ${SW_EVN[name] || name}" style="stroke-width:2;stroke-linecap:round"><g vector-effect="non-scaling-stroke">${g.replace(/<line /g, '<line vector-effect="non-scaling-stroke" ').replace(/<circle /g, '<circle vector-effect="non-scaling-stroke" ')}</g></svg>${cap}</figure>`;
+  // one frame for the four poses (sway shows), centred on the swing's own horizontal extent
+  let x0 = 1, x1 = 0, y0 = 1, y1 = 0; for (const e in pose) for (const q of pose[e] || []) if (q && q[0] != null) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); }
+  const side = Math.max(x1 - x0, y1 - y0, 0.2) * 1.12, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  return `<figure><svg viewBox="${(cx - side / 2).toFixed(3)} ${(cy - side / 2).toFixed(3)} ${side.toFixed(3)} ${side.toFixed(3)}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="stick figure at ${SW_EVN[name] || name}" style="stroke-width:2;stroke-linecap:round"><g vector-effect="non-scaling-stroke">${g.replace(/<line /g, '<line vector-effect="non-scaling-stroke" ').replace(/<circle /g, '<circle vector-effect="non-scaling-stroke" ')}</g></svg>${cap}</figure>`;
 }
 function metricRow(k, m){
   if (!m.available) return `<tr><td>${esc(swLabel(k))}</td><td class="n">–</td><td>${evb("UNKNOWN")}</td><td><span class="sub">${esc(m.reason || "not measured")}</span></td></tr>`;
@@ -983,7 +986,7 @@ function sessionDetail(s){
     <label>Where <select data-swset="kind"><option value="">—</option>${SW_KINDS.map(([v, l]) => `<option value="${v}" ${s.kind === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
     <label>Day <input type="date" data-swset="date" value="${esc(s.date || "")}"></label></div>`;
   const src = s.source || {}, an = s.analysis || {};
-  html += `<p class="help" style="font-size:12.5px;color:var(--mute)">${src.fps ? `${Math.round(src.fps)} fps${src.fps_used && src.fps_used !== src.fps ? ` (analysed at ${Math.round(src.fps_used)})` : ""}` : ""}${src.size ? ` · ${src.size[0]}×${src.size[1]}` : ""}${an.backend ? ` · pose: ${esc(an.backend)}` : ""} · ${s.swings.length} swing${s.swings.length === 1 ? "" : "s"} found${(s.rejected || []).length ? `, ${s.rejected.length} motion${s.rejected.length === 1 ? "" : "s"} rejected as not a swing` : ""}${src.created ? ` · filmed ${esc(new Date(src.created).toLocaleString())}` : " · the video carries no recording time"}${s.harness ? ` · harness ${esc(s.harness)}` : ""}.${(s.notes || []).length ? " " + esc(s.notes.join(" ")) : ""}</p>`;
+  html += `<p class="help" style="font-size:12.5px;color:var(--mute)">${src.fps ? `${Math.round(src.fps)} fps${src.fps_used && src.fps_used !== src.fps ? ` (analysed at ${Math.round(src.fps_used)})` : ""}` : ""}${src.size ? ` · ${src.size[0]}×${src.size[1]}` : ""}${an.backend ? ` · pose: ${esc(an.backend)}` : ""} · ${s.swings.length} swing${s.swings.length === 1 ? "" : "s"} found${(s.rejected || []).length ? `, ${s.rejected.length} motion${s.rejected.length === 1 ? "" : "s"} rejected as not a swing` : ""}${src.created ? ` · filmed ${esc(/[+-]\d\d:?\d\d$/.test(src.created) && !/[+-]00:?00$/.test(src.created) ? src.created.slice(0, 16).replace("T", " ") + " (local time where it was filmed)" : new Date(src.created).toLocaleString())}` : " · the video carries no recording time"}${s.harness ? ` · harness ${esc(s.harness)}` : ""}.${(s.notes || []).length ? " " + esc(s.notes.join(" ")) : ""}</p>`;
   html += compareBlock(s);
   html += `<h3 style="margin:16px 0 4px">Swing by swing</h3>`;
   for (const w of s.swings) { const L = links.find(x => x.swing === w.index); const r = L && L.round ? roundById(L.round) : null;
@@ -1122,7 +1125,7 @@ function renderSettings(){
     <label>Short game vs scratch <select id="s_short_game_extra"><option value="0" ${P.short_game_extra==0?"selected":""}>scratch (57% up-and-down)</option><option value="0.2" ${P.short_game_extra==0.2?"selected":""}>+0.2 strokes a chip</option><option value="0.4" ${P.short_game_extra==0.4?"selected":""}>+0.4</option><option value="0.6" ${P.short_game_extra==0.6?"selected":""}>+0.6</option><option value="0.8" ${P.short_game_extra==0.8?"selected":""}>+0.8</option></select></label>
     <label>Baseline curve <select id="s_baseline"><option value="scratch" ${P.baseline==="scratch"?"selected":""}>scratch amateur</option><option value="tour" ${P.baseline==="tour"?"selected":""}>PGA Tour (Broadie)</option></select></label>
     <label>Desert costs <select id="s_penalty"><option value="1" ${P.penalty==1?"selected":""}>a stroke and a drop (local rule)</option><option value="0.5" ${P.penalty==0.5?"selected":""}>half a stroke (often playable)</option><option value="0" ${P.penalty==0?"selected":""}>nothing beyond a rough lie</option></select></label>
-    <p class="help">Dispersion at 100% is the model calibrated to Arccos scratch-golfer green hits (83/71/63/47/36% from 100/130/150/200/240 yards on generic greens). On the mapped greens of your nine courses the same pattern hits 75/64/57/43/34% from those distances (fairway, middle pin; pipeline/audit_model.py), so it is not a 3-handicap calibration and nothing here measures yours yet: your marked rounds will. The baseline curve is the scratch amateur's; strokes gained in Rounds are against it. The short-game setting adds strokes to every chip, pitch and bunker shot inside 50 yards — it is the one number the go/lay-up verdicts turn on.</p>
+    <p class="help">Dispersion at 100% is the model calibrated to Arccos scratch-golfer green hits (83/71/63/47/36% from 100/130/150/200/240 yards on generic greens). On the mapped greens of eight of your nine courses (Geronimo has none mapped) the same pattern hits 75/64/57/43/34% from those distances (fairway, middle pin; pipeline/audit_model.py), so it is not a 3-handicap calibration and nothing here measures yours yet: your marked rounds will. The baseline curve is the scratch amateur's; strokes gained in Rounds are against it. The short-game setting adds strokes to every chip, pitch and bunker shot inside 50 yards — it is the one number the go/lay-up verdicts turn on.</p>
   </section>
   <section><h3>Your clubs</h3>
     <div class="tablewrap"><table class="clubs"><thead><tr><th>Club</th><th class="n">Carry</th><th class="n">Roll firm</th><th class="n">Roll soft</th></tr></thead><tbody>
