@@ -113,12 +113,13 @@
     const fromTee = ball[0] === 0 && ball[1] === 0; const fromLie = fromLieGiven != null ? fromLieGiven : fromTee ? L.TEE : lieAt(H, ball[0], ball[1]); const lf = LIEFX[fromLie] || LIEFX[1];
     const sLat = Math.max(2.5, club.carry * club.latPct * P.disp * lf.disp), sDist = Math.max(2.0, club.carry * club.distPct * P.disp * lf.disp);
     const k = descentK(P, club.name.replace("easy ", ""), club.carry + club.roll);
+    const bias = (P.lat_bias || 0) * club.carry;   // yards, + = right: a day's (or a player's) offset of the whole pattern (Omega G)
     const z0 = zAt(H, ball[0], ball[1]);
     const px = out.px, py = out.py;
     for (let i = 0; i < n; i++) {
       const good = rand() > P.q_miss; const [g1, g2] = gaussPair(rand);
       let z = g1 > 0 ? g1 * (1 + P.skew_right) : g1;
-      const lat = (good ? z * sLat : z * sLat * P.miss_lat_mult) + drift;
+      const lat = (good ? z * sLat : z * sLat * P.miss_lat_mult) + drift + bias;
       let dist = (good ? carryW + g2 * sDist : carryW - P.miss_short_pct * club.carry + g2 * sDist * P.miss_dist_mult) * lf.carry;
       let x = ball[0] + dx * dist * YD + nx * lat * YD, y = ball[1] + dy * dist * YD + ny * lat * YD;
       for (let it = 0; it < 2; it++) { const zl = zAt(H, x, y); const tot = dist + k * (z0 - zl) / 3; x = ball[0] + dx * tot * YD + nx * lat * YD; y = ball[1] + dy * tot * YD + ny * lat * YD; if (it === 1) dist = tot; }
@@ -182,7 +183,8 @@
     const seg = h.line.length > 2 ? h.line[1] : H.basePin; let aim0 = Math.round(Math.atan2(seg[1], seg[0]) * 180 / Math.PI / P.aim_step) * P.aim_step; if (Math.abs(aim0) < P.aim_step) aim0 = 0;
     for (const name of clubs) {
       const club = clubParams(name, P, altf); const curve = []; let best = null;
-      for (let aim = aim0 + P.aim_min; aim <= aim0 + P.aim_max; aim += P.aim_step) {
+      const aims = opts && opts.aims ? opts.aims : null;   // simulation tooling: play given aims only (the model is unchanged)
+      for (let aim = aims ? aims[0] : aim0 + P.aim_min, ai = 0; aims ? ai < aims.length : aim <= aim0 + P.aim_max; aims ? (aim = aims[++ai]) : (aim += P.aim_step)) {
         const rand = mulberry32(P.seed * 1000 + 7); // common random numbers across aims and clubs
         shoot(H, [0, 0], aim, club, n, rand, P, bearing, buf);
         const r = price(H, buf.px, buf.py, n, P, base, 0); r.aim = aim; curve.push(r);

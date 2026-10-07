@@ -103,7 +103,7 @@
         if (club && club !== "partial wedge") {
           let po = o._tee.options.find(x => x.club === club);
           if (!po) { const extra = E.teeOptions(h, P, altf, { n: 800, keep: 0, clubs: [club] }); po = extra[0]; }
-          o.E_intent = po.best.E; o.sg_dec = r.E - o.E_intent; o.engineClub = r.pick.club; o.engineE = r.E; o.alt = club === r.pick.club ? null : { what: r.pick.club + " (the engine's pick)", E: r.E };
+          o._po = po; o.E_intent = po.best.E; o.sg_dec = r.E - o.E_intent; o.engineClub = r.pick.club; o.engineE = r.E; o.alt = club === r.pick.club ? null : { what: r.pick.club + " (the engine's pick)", E: r.E };
         } else { o.E_intent = r.E; o.flags.push("club unknown — the decision is not separated from the swing"); }
       } else if (o.E_lay != null) {
         let intent = o.intentSet;
@@ -127,6 +127,17 @@
         else if (!o.onGreen) { const off = offsets(S[i].pos, nx.pos, H.pin); o.offLat = round2(off.lat); if (cat !== "layup") o.offDepth = round2(off.depth); o.total = Math.round(distYd(S[i].pos, nx.pos)); }
         else o.next_rFt = nx.rFt;
       }
+      // offAim: the miss against the line the engine gave for that shot — its aim for the club you hit off the tee, its target from that
+      // spot into the green (none for a lay-up). Today mode reads offAim, so a hole that asks for a line left of the fairway is not taken
+      // for a day that misses left. After a penalty the drop marks the side the ball went (a lower bound on the miss: offAimCensored);
+      // leaving those shots out would hide exactly the misses a bad day is made of.
+      if (nx && nx.pos && !o.onGreen && cat !== "layup" && o.intent !== "lay") {
+        if (i === 0 && h.par !== 3) { let po = o._po; if (!po && !o.clubUsed) { po = o._tee.options.find(x => x.club === o._tee.pick.club); o.clubAssumed = o._tee.pick.club; }   // a tee ball lost to a penalty: the club is unknown, the engine's pick is assumed
+          if (po) { const seg = h.line.length > 2 ? h.line[1] : H.basePin; const off = offsets([0, 0], nx.pos, seg); const segDeg = Math.atan2(seg[1], seg[0]) * 180 / Math.PI;
+          o.aimLine = po.best.aim; o.offAim = round2(off.lat - off.along * Math.tan((po.best.aim - segDeg) * Math.PI / 180)); } }
+        else { const ap = i === 0 ? o._tee && o._tee.approach : o._app; if (ap && ap.best) o.offAim = round2(offsets(S[i].pos, nx.pos, H.pin).lat - ap.best.lat); }
+        if (o.offAim != null && nx.pen > 0) o.offAimCensored = true;
+      }
       cats[cat].sg += o.sg_exec; cats[cat].n++;
       if (o.sg_dec != null) { cats.decision.sg += o.sg_dec; cats.decision.n++; }
     }
@@ -140,6 +151,27 @@
     out.shots = S.map(o => { const q = {}; for (const key in o) if (key[0] !== "_") q[key] = typeof o[key] === "number" ? round2(o[key]) : o[key]; return q; });
     return out;
   }
+
+  // ---------- the model a round was priced under (Omega G, 2026-10-07) ----------
+  // Before this, a round stored only the settings that differed from the build's defaults, so every later change to the defaults, the
+  // baseline curve or the dispersion silently re-priced old rounds while the page still said "scratch baseline". A round now carries the
+  // full model it was started under and a stamp (curve and club-table fingerprints), and the Rounds view says when a stamp differs.
+  const COND_KEYS = ["wind_mph", "wind_from", "temp_f", "setting", "pin"];
+  const MODEL_KEYS = ["baseline", "disp", "q_miss", "skew_right", "lat_pct", "dist_pct", "miss_lat_mult", "miss_short_pct", "miss_dist_mult", "lat_bias",
+    "penalty", "scrub_extra", "short_game_extra", "home_ft", "alt_rule", "angles", "temp_pct_per_10f", "head_pct_per_mph", "tail_pct_per_mph", "cross_yd_per_mph", "clubsOverride"];
+  function fnv(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return ("0000000" + h.toString(16)).slice(-8); }
+  function curveId(name) { return name + ":" + fnv(JSON.stringify(D.bases[name] || null)); }
+  function modelStamp(P) { return { curve: curveId(P.baseline), clubs: fnv(JSON.stringify(D.clubs)), data: D.generated }; }
+  function snapshot(P) { const keep = {}; for (const k of COND_KEYS.concat(MODEL_KEYS)) if (P[k] !== undefined) keep[k] = JSON.parse(JSON.stringify(P[k])); keep._stamp = modelStamp(Object.assign({}, D.defaults, keep)); return keep; }
+  // A round from before stamps: fill its model from the defaults it was being priced under and say so (assumed: no model change shipped
+  // between the ledger's release, 2026-10-06, and the stamp).
+  function stampRound(round) { if (!round || (round.P && round.P._stamp)) return false; const P = Object.assign({}, D.defaults, round.P || {}); round.P = snapshot(P); round.P._stamp.assumed = true; return true; }
+  // what differs between the model a round was started under and the one available now (empty = the same yardstick)
+  function stampDrift(round, Pnow) { const st = round && round.P && round.P._stamp; if (!st) return ["no model stamp"]; const out = [];
+    const cur = modelStamp(Object.assign({}, D.defaults, round.P)); if (st.curve !== cur.curve) out.push(`the ${round.P.baseline} curve has changed since this round (${st.curve} then, ${cur.curve} now)`);
+    if (st.clubs !== cur.clubs) out.push("the model's club table has changed since this round");
+    if (Pnow) { for (const k of ["baseline", "disp", "q_miss", "skew_right", "short_game_extra", "lat_bias"]) { const a = round.P[k] === undefined ? D.defaults[k] : round.P[k], b = Pnow[k] === undefined ? D.defaults[k] : Pnow[k]; if (JSON.stringify(a) !== JSON.stringify(b)) out.push(`${k} ${JSON.stringify(a)} then, ${JSON.stringify(b)} now`); } }
+    return out; }
 
   // ---------- a round ----------
   function roundParams(round) { return Object.assign({}, D.defaults, round.P || {}); }
@@ -269,12 +301,18 @@
     const pick = arr => arr[Math.floor(rand() * arr.length)];
     const round = { id: "sim_" + courseKey + "_" + (seed || 1), course: courseKey, date: (opts && opts.date) || new Date().toISOString().slice(0, 10), started: new Date().toISOString(), tees: c.tees, P: { wind_mph: P.wind_mph, wind_from: P.wind_from, temp_f: P.temp_f, setting: P.setting, pin: P.pin }, sample: true, name: "Sample round — simulated by the engine, not your golf", holes: {} };
     const gr = E.lut(P.baseline, "green_ft");
+    // opts.execP: the day's execution differs from the pattern the player aims with (a bad — or good — swing day): targets are chosen
+    // with P, shots are drawn with P + execP at those same targets. Benchmarks only (Today mode, H1); the round keeps the truth.
+    const X = opts && opts.execP ? Object.assign({}, P, opts.execP) : null; if (X) round.simTruth = { execP: opts.execP };
+    const execAs = (h, ball, ap, altf2) => { const b = ap.best; const r2 = E.approach(h, ball, X, altf2, { n: 600, keep: 120, lats: [b.lat], depths: [b.depth], club: ap.club && !/^easy /.test(ap.club) ? ap.club : undefined }); return r2 && r2.best ? r2 : ap; };
     for (const h of c.holes) {
       if (h.nodata || !h.grid || (h.src.fairway === "none" && h.par !== 3)) continue;
       const H = E.decodeHole(h); E.applyPin(H, P); const shots = [{ x: 0, y: 0, src: "sim" }]; let pos = [0, 0]; let pen = 0; let holed = false; let putts = 0; let guard = 0;
       // tee shot: the engine's pick, except every third hole where a plan club exists and differs (a decision to price)
-      if (h.par !== 3) { const r = E.runHole(c, h, P, { n: 800 }); let club = r.pick.club; if (h.plan && h.plan.club && h.plan.club !== club && h.hole % 3 === 0) club = h.plan.club; const o = r.options.find(x => x.club === club) || E.teeOptions(h, P, altf, { n: 800, keep: 120, clubs: [club] })[0]; const s = pick(o.best.sample); pos = [s[0], s[1]]; }
-      else { const ap = E.approach(h, [0, 0], P, altf, { n: 600, keep: 120 }); if (!ap.best) continue; const s = pick(ap.best.sample); pos = [s[0], s[1]]; }
+      if (h.par !== 3) { const r = E.runHole(c, h, P, { n: 800 }); let club = r.pick.club; if (h.plan && h.plan.club && h.plan.club !== club && h.hole % 3 === 0) club = h.plan.club; let o = r.options.find(x => x.club === club) || E.teeOptions(h, P, altf, { n: 800, keep: 120, clubs: [club] })[0];
+        if (X) o = E.teeOptions(h, X, altf, { n: 800, keep: 120, clubs: [club], aims: [o.best.aim] })[0];   // aimed with the player's normal pattern, played with the day's
+        const s = pick(o.best.sample); pos = [s[0], s[1]]; }
+      else { let ap = E.approach(h, [0, 0], P, altf, { n: 600, keep: 120 }); if (!ap.best) continue; if (X) ap = execAs(h, [0, 0], ap, altf); const s = pick(ap.best.sample); pos = [s[0], s[1]]; }
       while (!holed && guard++ < 10) {
         // penalty: the ball is in water or desert → drop back toward where it came from, one stroke
         let lie = E.lieAt(H, pos[0], pos[1]); const prev = shots[shots.length - 1]; let penHere = 0;
@@ -293,6 +331,7 @@
         let ap; const gl = rYd >= 160 && h.par >= 4 ? E.goVsLay(h, pos, P, altf, { n: 500, keep: 0 }) : null;
         if (gl && gl.lay && (!gl.go.best || (gl.delta != null && gl.delta < 0 && rand() < 0.8) || rand() < 0.25)) { const cl = E.clubForDistance(Math.max(60, rYd - gl.lay.leave), P, altf, false); ap = E.approach(h, pos, P, altf, { n: 600, keep: 120, club: cl.name.replace("easy ", "") }); }
         else ap = E.approach(h, pos, P, altf, { n: 600, keep: 120 });
+        if (X && ap && ap.best) ap = execAs(h, pos, ap, altf);
         if (!ap || !ap.best || !ap.best.sample) { holed = true; putts = 2; break; }
         const s = pick(ap.best.sample); pos = [s[0], s[1]];
       }
@@ -301,5 +340,5 @@
     return round;
   }
 
-  window.LoopLedger = { analyzeHole, analyzeRound, assemble, roundParams, holesToAnalyze, patterns, review, playerModel, simulateRound, inferClub, offsets, shotText, whereTo, CATS, CAT_LABEL, lieWord, allShots };
+  window.LoopLedger = { snapshot, stampRound, stampDrift, modelStamp, curveId, COND_KEYS, MODEL_KEYS, analyzeHole, analyzeRound, assemble, roundParams, holesToAnalyze, patterns, review, playerModel, simulateRound, inferClub, offsets, shotText, whereTo, CATS, CAT_LABEL, lieWord, allShots };
 })();

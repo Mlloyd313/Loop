@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="acdc3deaaa">
+<meta name="loop-build" content="c8466b8497">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -105,7 +105,8 @@ h2{font-family:var(--num);font-weight:600;font-size:16px;letter-spacing:.02em;ma
 .plan .vs{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .chip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--panel2);color:var(--ink2)}
 .chip.ok{background:#e3f4e8;color:#1f6b33}.chip.bad{background:#fde7ea;color:#9b1024}.chip.new{background:#e8eefc;color:#1e3f9a}
-:root[data-theme="dark"] .chip.ok,:root:not([data-theme="light"]) .chip.ok{background:#1b3a25;color:#8fe0a4}
+:root[data-theme="dark"] .chip.ok{background:#1b3a25;color:#8fe0a4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chip.ok{background:#1b3a25;color:#8fe0a4}}
 .plan details{margin-top:8px}.plan summary{cursor:pointer;color:var(--ink2);font-size:13px}
 .plan p{margin:8px 0 0;color:var(--ink2);font-size:13.5px}
 table{border-collapse:collapse;width:100%;font-size:13.5px}
@@ -159,12 +160,12 @@ tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
 .holed input{width:60px;padding:5px 8px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);text-align:right;font-family:var(--num);font-size:16px}
 .rounds h1{font-family:var(--num);font-size:28px;margin:4px 0 2px}
 .rounds .banner{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-left:4px solid var(--engine);background:var(--panel);border-radius:0 10px 10px 0;margin:10px 0 16px}
-.rounds .list div.r{display:flex;gap:8px 16px;align-items:center;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--rule)}
-.rounds .list div.r:first-child{border-top:0}
-.rounds .list .when{font-family:var(--num);font-weight:600;min-width:96px}
+.rounds .list div.r,.swingv .list div.r{display:flex;gap:8px 16px;align-items:center;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--rule)}
+.rounds .list div.r:first-child,.swingv .list div.r:first-child{border-top:0}
+.rounds .list .when,.swingv .list .when{font-family:var(--num);font-weight:600;min-width:96px}
 .rounds .list .sgv{font-family:var(--num);font-weight:700;font-size:18px;min-width:60px;text-align:right}
-.rounds .list .tools{margin-left:auto;display:flex;gap:6px}
-.rounds .list .tools button{padding:3px 9px;font-size:12.5px}
+.rounds .list .tools,.swingv .list .tools{margin-left:auto;display:flex;gap:6px}
+.rounds .list .tools button,.swingv .list .tools button{padding:3px 9px;font-size:12.5px}
 .catbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:10px 0 16px}
 .catbar>div{padding:8px 10px;background:var(--panel);border-radius:8px}
 .catbar .v{font-family:var(--num);font-size:22px;font-weight:700;line-height:1.1}
@@ -179,6 +180,27 @@ tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
 .sample{border:1px dashed var(--plan);border-radius:8px;padding:10px 12px;font-size:13.5px;color:var(--ink2)}
 .progress{font-size:12.5px;color:var(--mute);margin:4px 0 10px}
 .empty{padding:40px;text-align:center;color:var(--mute)}
+/* Swing view (Omega G): sessions from the swing harness, me vs me, the experiments and the evidence */
+.swingv h1{font-family:var(--num);font-size:28px;margin:4px 0 2px}
+.swingv .lede{color:var(--ink2);max-width:76ch;margin:0 0 12px}
+.ev{display:inline-block;font:600 10.5px/1.6 var(--font);letter-spacing:.04em;padding:0 6px;border-radius:4px;vertical-align:1px;white-space:nowrap}
+.ev.OBSERVED{background:#e3f4e8;color:#1f6b33}.ev.ESTIMATED{background:#e8eefc;color:#1e3f9a}.ev.INFERRED{background:#fff1d6;color:#7a4b00}.ev.PREDICTED{background:#f2e6fb;color:#5b2a86}.ev.UNKNOWN{background:var(--panel2);color:var(--mute)}
+:root[data-theme="dark"] .ev.OBSERVED{background:#1b3a25;color:#8fe0a4}:root[data-theme="dark"] .ev.ESTIMATED{background:#1d2b4f;color:#a9c0ff}:root[data-theme="dark"] .ev.INFERRED{background:#3d2c0a;color:#ffd27a}:root[data-theme="dark"] .ev.PREDICTED{background:#33204a;color:#dcb8ff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ev.OBSERVED{background:#1b3a25;color:#8fe0a4}:root:not([data-theme="light"]) .ev.ESTIMATED{background:#1d2b4f;color:#a9c0ff}:root:not([data-theme="light"]) .ev.INFERRED{background:#3d2c0a;color:#ffd27a}:root:not([data-theme="light"]) .ev.PREDICTED{background:#33204a;color:#dcb8ff}}
+.swingv table td .sub{display:block;font-size:12px;color:var(--mute)}
+.figs{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0 10px}
+.figs figure{margin:0;text-align:center;font-size:11px;color:var(--mute)}
+.figs svg{width:76px;height:92px;background:var(--panel);border-radius:6px;display:block}
+.hyp{padding:12px 14px;background:var(--panel);border-radius:10px;margin:0 0 10px}
+.hyp .st{font-family:var(--num);font-weight:700}
+.hyp .st.supported{color:var(--ok)}.hyp .st.insufficient{color:var(--mute)}.hyp .st.not{color:var(--engine)}
+.today{margin:14px 0 10px;padding:12px 14px;border-left:4px solid #b26a00;background:var(--panel);border-radius:0 10px 10px 0;font-size:14px}
+.today b{font-family:var(--num)}
+.today .why{font-size:12.5px;color:var(--ink2);margin-top:4px}
+.swingv textarea{width:100%;height:80px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);padding:8px;font:12px/1.4 ui-monospace,Consolas,monospace}
+.swingv .row{display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.swingv select,.swingv input[type=text],.swingv input[type=date]{padding:4px 6px;border:1px solid var(--rule);border-radius:6px;background:var(--paper)}
+
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:8px;font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
 .toast.on{opacity:1}
 .pocket{display:none}
@@ -206,6 +228,7 @@ tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
       <button data-view="hole" aria-current="page">Hole</button>
       <button data-view="round">Course</button>
       <button data-view="rounds">Rounds</button>
+      <button data-view="swing">Swing</button>
       <button data-view="audit"><span class="long">Plan </span>audit</button>
       <button data-view="settings">Settings</button>
     </nav>
@@ -240,6 +263,7 @@ tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
   </section>
   <section class="round" id="viewRound" hidden></section>
   <section class="rounds" id="viewRounds" hidden></section>
+  <section class="swingv" id="viewSwing" hidden></section>
   <section class="audit" id="viewAudit" hidden></section>
   <section class="settings" id="viewSettings" hidden></section>
   <section class="pocket" id="pocket"></section>
@@ -248,22 +272,25 @@ tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
 <script src="data.js"></script>
 <script src="engine.js"></script>
 <script src="ledger.js"></script>
+<script src="swing.js"></script>
 <script>
 (function(){
-const D = window.LOOP_DATA, E = window.LoopEngine, LG = window.LoopLedger, LIE = E.L, YD = E.YD;
+const D = window.LOOP_DATA, E = window.LoopEngine, LG = window.LoopLedger, SW = window.LoopSwing, LIE = E.L, YD = E.YD;
 const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
 const IN_ARTIFACT = !window.LOOP_PHONE && (!!window.claude || /claude\.(ai|com)$/.test(location.hostname));   // the claude.ai copy: no print dialog, no location API
 const LIECOL = {0:"#cdb08a",1:"#6fbf5a",2:"#3f7a3a",3:"#2ecc71",4:"#ead27d",5:"#4f93dd",6:"#9fd9a8",7:"#d9c48f",8:"#a98b5c",9:"#d49ad6"};
 const ODDS = [["fairway","var(--fw)","fairway"],["rough","var(--rough)","rough"],["sand","var(--sand)","sand"],["green","var(--green)","on the green"],["water","var(--water)","water"],["desert","var(--desert)","desert / penalty"]];
 // ---------------- state ----------------
 const store = { get(k, d){ try{ const v = localStorage.getItem("loop."+k); return v==null? d : JSON.parse(v);}catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem("loop."+k, JSON.stringify(v)); }catch(e){} } };
-const state = { overrides: store.get("overrides", {}), fixMode: false, markMode: false, pendingPen: 0, course: store.get("course", D.courses[0].key), hole: store.get("hole", 15), view: "hole", P: Object.assign({}, D.defaults, store.get("P", {})), planClubs: store.get("planClubs", {}), rounds: store.get("rounds", []), activeRound: store.get("activeRound", null), openRound: null, tap: null, showSurf: false, results: {}, busy: null, ledger: {} };
+const state = { overrides: store.get("overrides", {}), fixMode: false, markMode: false, pendingPen: 0, course: store.get("course", D.courses[0].key), hole: store.get("hole", 15), view: "hole", P: Object.assign({}, D.defaults, store.get("P", {})), planClubs: store.get("planClubs", {}), rounds: store.get("rounds", []), swings: store.get("swings", []), practice: store.get("practice", []), activeRound: store.get("activeRound", null), openRound: null, tap: null, showSurf: false, results: {}, busy: null, ledger: {} };
 E.setOverrides(state.overrides);
 // Scores entered before the ledger existed (one number per hole, no date) become one scores-only round per course, so nothing is lost.
 (function migrateScores(){ const old = store.get("scores", null); if (!old || !Object.keys(old).length) return; const byCourse = {};
   for (const k in old) { const [ck, hn] = k.split(":"); if (+old[k] > 0) (byCourse[ck] = byCourse[ck] || {})[hn] = { shots: [], score: +old[k] }; }
   for (const ck in byCourse) state.rounds.push({ id: "legacy_" + ck, course: ck, date: new Date().toLocaleDateString("sv-SE"), legacy: true, name: "Scores entered before the ledger (no positions)", holes: byCourse[ck], P: {} });
   store.set("rounds", state.rounds); try { localStorage.removeItem("loop.scores"); } catch(e) {} })();
+// Rounds from before model stamps (2026-10-07) get the model they were being priced under, marked as assumed (ledger.js stampRound).
+(function stampOldRounds(){ let n = 0; for (const r of state.rounds) if (!r.sample && LG.stampRound(r)) n++; if (n) store.set("rounds", state.rounds); })();
 // settings keys that live in the engine params
 // course(): the course on screen; course(key): any course (defined with the rounds code below)
 function hole(){ return course().holes.find(h => h.hole === state.hole) || course().holes[0]; }
@@ -493,7 +520,7 @@ function activeRound(){ return state.activeRound ? roundById(state.activeRound) 
 function currentRound(){ const a = activeRound(); if (a && a.course === state.course) return a; const o = state.openRound ? roundById(state.openRound) : null; if (o && o.course === state.course) return o; return null; }
 function roundForCourse(c, create){ const a = activeRound(); if (a && a.course === c.key) return a; const rs = state.rounds.filter(r => r.course === c.key && !r.sample).sort((x, y) => (y.date||"").localeCompare(x.date||"")); if (rs.length) return rs[0]; if (!create) return null; const r = newRound(c.key, { name: "Scores only (entered on the Course view)" }); state.rounds.push(r); saveRounds(); return r; }
 function roundRec(h, create){ const r = currentRound(); if (!r) return null; if (!r.holes) r.holes = {}; if (!r.holes[h.hole] && create) r.holes[h.hole] = { shots: [], score: null }; return r.holes[h.hole] || null; }
-function snapshotP(){ const p = state.P; const keep = {}; for (const k of ["wind_mph","wind_from","temp_f","setting","pin","disp","q_miss","skew_right","baseline","penalty","scrub_extra","short_game_extra","home_ft","clubsOverride"]) if (p[k] !== undefined && JSON.stringify(p[k]) !== JSON.stringify(D.defaults[k])) keep[k] = p[k]; return keep; }
+function snapshotP(){ return LG.snapshot(state.P); }   // the full model and today's conditions, stamped (ledger.js)
 function newRound(courseKey, extra){ const c = D.courses.find(x => x.key === courseKey); return Object.assign({ id: "r_" + Date.now().toString(36), course: courseKey, date: today(), started: new Date().toISOString(), tees: c.tees, P: snapshotP(), holes: {} }, extra || {}); }
 function startRound(courseKey){ const r = newRound(courseKey); state.rounds.push(r); state.activeRound = r.id; state.openRound = r.id; saveRounds(); if (state.course !== courseKey) { state.course = courseKey; store.set("course", courseKey); } state.hole = 1; store.set("hole", 1); state.tap = null; renderHeader(); setView("hole"); toast("Round started on " + (D.courses.find(x=>x.key===courseKey).name) + ": tee off, then mark the ball before every shot."); }
 function finishRound(){ const r = activeRound(); if (!r) return; r.finished = new Date().toISOString(); state.activeRound = null; state.openRound = r.id; saveRounds(); setView("rounds"); toast("Round saved. Here is what it says."); }
@@ -609,6 +636,7 @@ function renderHole(){
         ${A && A.best ? `<div><span>Then ${A.club} ${lieName(A.fromLie)} into the green</span><span>on <b>${pct(A.best.odds.green)}</b> · sand ${pct(A.best.odds.sand)} · water ${pct(A.best.odds.water)} · <b>${fmt(A.best.E)}</b> to hole out</span></div>` : ""}
         ${r.planE!=null && plan && plan!==o.club ? `<div><span>The plan's ${plan}</span><span>best line ${aimShort(r.planAim)} · <b>${fmt(r.planE)}</b> · costs <b style="color:var(--engine)">${sgn(r.planE - r.E)}</b> a hole</span></div>` : r.planE!=null && plan ? `<div><span>The plan's ${plan}</span><span>agrees with the engine</span></div>` : ""}
       </div></div>`;
+    html += todayCard(c, h, r);
     if (r.goLay && r.goLay.go.best) { const g = r.goLay; const goWin = g.delta!=null && g.delta>0;
       html += `<h2>Second shot from ${Math.round(g.R)} yards</h2><div class="go">
         <div class="${goWin?"win":""}"><div class="lbl">Go for it · ${g.go.club}</div><div class="v num">${fmt(g.go.best.E)}</div><div class="d">on ${pct(g.go.best.odds.green)} · sand ${pct(g.go.best.odds.sand)} · water ${pct(g.go.best.odds.water)} · penalty ${pct(g.go.best.odds.desert)}</div></div>
@@ -625,6 +653,7 @@ function renderHole(){
       ${a.best ? oddsBar(a.best.odds)+oddsLabels(a.best.odds) : `<div style="color:var(--mute);font-size:13.5px;margin-top:8px">No green surfaces are mapped here, so the number is the scratch curve for a ${Math.round(a.plays)}-yard shot, not a simulation.</div>`}
       ${a.best ? `<div class="rows"><div><span>Best target</span><span>${a.best.lat===0?"at the pin":Math.abs(a.best.lat)+" yd "+(a.best.lat<0?"left":"right")}${a.best.depth?", "+Math.abs(a.best.depth)+" yd "+(a.best.depth<0?"short":"long"):""} · median ${Math.round(a.best.prox)} ft from the hole</span></div>
       <div><span>Curve from this distance</span><span>fairway lie <b>${fmt(a.curveFairway)}</b></span></div></div>`:""}</div>`;
+    html += todayCard(c, h, r);
   } else if (r.kind === "gated") {
     html += `<div class="shot" style="border-color:var(--mute)"><div class="big" style="font-size:22px">Tee shot not priced</div><div style="color:var(--ink2);margin-top:6px">OpenStreetMap has no fairway for this hole and the imagery is not green enough to read one, so the engine will not invent the surfaces. The elevation and the plan still apply.</div></div>`;
   }
@@ -635,7 +664,7 @@ function renderHole(){
     for (const o of r.options) { const b=o.best; html += `<tr class="${o===r.options[0]?"pick":""}"><td>${o.club}${planClubFor(c,h)===o.club?` <span class="chip" style="background:var(--plan);color:#fff">plan</span>`:""}</td><td class="n">${Math.round(o.total)}</td><td>${aimShort(b.aim)}</td><td>${aimShort(o.window[0])}–${aimShort(o.window[1])}</td><td class="n"><b>${fmt(b.E)}</b></td><td><span class="mini">${ODDS.map(([k,cc])=>`<i style="width:${(b.odds[k]||0)*100}%;background:${cc}"></i>`).join("")}</span> <span style="font-size:12px;color:var(--mute)">fw ${pct(b.odds.fairway)} · trouble ${pct((b.odds.desert||0)+(b.odds.water||0)+(b.odds.sand||0))}</span></td><td class="n">${Math.round(b.rem)}</td><td class="n">${Math.round(b.plays)}</td></tr>`; }
     html += `</tbody></table></div>`;
   }
-  html += `<div class="src">${ovr ? `<b>Green moved by you</b> (${ovr.poly != null ? "to a mapped green" : "to a tapped point, 12-yd disc"}; the elevation profile, the line and every number follow it; this correction lives in this browser — Settings → Corrections has it as text for the rebuild). ` : ""}Surfaces: fairway from ${h.src.fairway==="osm"?"OpenStreetMap":h.src.fairway==="imagery"?"the aerial imagery":"nowhere (unpriced)"}, green from ${h.src.green==="osm"?"OpenStreetMap":h.src.green==="imagery"?"the aerial imagery":"a 12-yard disc at the line end"}${h.src.sand?`, sand from ${h.src.sand.replace("+"," and ")}`:""}. Elevation: ${(c.lidar&&c.lidar.title)||"USGS 3DEP"}. Dispersion: ${state.P.clubsOverride?"your launch-monitor table":"the calibrated 3-handicap model"} at ${Math.round(state.P.disp*100)}%, ${Math.round(state.P.q_miss*100)}% mishits, ${state.P.baseline} baseline. Desert and water cost a stroke and a drop; the numbers compare options and are not a score prediction.</div>`;
+  html += `<div class="src">${ovr ? `<b>Green moved by you</b> (${ovr.poly != null ? "to a mapped green" : "to a tapped point, 12-yd disc"}; the elevation profile, the line and every number follow it; this correction lives in this browser — Settings → Corrections has it as text for the rebuild). ` : ""}Surfaces: fairway from ${h.src.fairway==="osm"?"OpenStreetMap":h.src.fairway==="imagery"?"the aerial imagery":"nowhere (unpriced)"}, green from ${h.src.green==="osm"?"OpenStreetMap":h.src.green==="imagery"?"the aerial imagery":"a 12-yard disc at the line end"}${h.src.sand?`, sand from ${h.src.sand.replace("+"," and ")}`:""}. Elevation: ${(c.lidar&&c.lidar.title)||"USGS 3DEP"}. Dispersion: ${state.P.clubsOverride?"your club table":"the model calibrated to Arccos scratch green-hit rates (not a 3-handicap model; on these greens it hits fewer: see Settings)"} at ${Math.round(state.P.disp*100)}%, ${Math.round(state.P.q_miss*100)}% mishits, ${state.P.baseline} baseline. Desert and water cost a stroke and a drop; the numbers compare options and are not a score prediction.</div>`;
   card.innerHTML = html;
   const ct2 = $("#clearTap2"); if (ct2) ct2.addEventListener("click", () => { state.tap = null; $("#clearTap").style.display = "none"; renderHole(); });
   const ho = $("#hintOk"); if (ho) ho.addEventListener("click", () => { store.set("hintSeen", true); ho.parentElement.remove(); });
@@ -776,6 +805,7 @@ function renderRounds(){
   if (real.length) {
     const m = LG.playerModel(analyses);
     html += `<h2>Your game across ${m.rounds} round${m.rounds===1?"":"s"}${pending ? ` (pricing ${pending} more…)` : ""} · ${m.holes} holes · ${m.shots} priced shots</h2>`;
+    { const ys = new Set(real.map(r => r.P ? [r.P.baseline || D.defaults.baseline, r.P.disp == null ? D.defaults.disp : r.P.disp, r.P.short_game_extra || 0, (r.P._stamp || {}).curve || ""].join("|") : "")); if (ys.size > 1) html += `<p class="help" style="font-size:12.5px;color:var(--engine)">These ${real.length} rounds were priced under ${ys.size} different yardsticks (baseline curve, dispersion or short-game setting); their strokes gained are not on one scale.</p>`; }
     if (m.rounds) {
       const tot = cc => m.trend.reduce((s, t) => s + (t.cats[cc]||0), 0); const per18 = v => m.holes >= 9 ? ` <span style="font:12px var(--font);color:var(--mute)">${sgn(v / m.holes * 18, 1)} per 18</span>` : "";
       const allSg = m.trend.reduce((s,t)=>s+(t.sg||0),0);
@@ -827,7 +857,7 @@ function roundDetail(r, onDone){
   let html = `<h2 style="margin-top:26px">${esc(roundLabel(r))}${r.id===state.activeRound ? " — in progress" : ""}</h2>`;
   if (r.sample) html += `<div class="sample" style="margin-bottom:10px">A sample round: the engine played itself here, drawing every shot from its own distributions (the plan's tee club every third hole, so the decision line has something to show). It is not your golf and is never counted in your game above.</div>`;
   if (!res) { html += `<div class="progress">Pricing the round… the engine runs every hole you marked under that day's settings.</div>`; return html; }
-  const P = res.P; html += `<div class="progress">Priced under ${P.wind_mph > 0 ? P.wind_mph + " mph from " + P.wind_from + "°" : "calm"}, ${P.temp_f}°F, ${P.setting}, pin ${P.pin}, ${P.baseline} baseline, dispersion ${Math.round(P.disp*100)}% — the settings when the round was started. ${res.nScored} of ${c.holes.length} holes scored, ${res.nComplete} fully marked.</div>`;
+  const P = res.P; html += `<div class="progress">Priced under ${P.wind_mph > 0 ? P.wind_mph + " mph from " + P.wind_from + "°" : "calm"}, ${P.temp_f}°F, ${P.setting}, pin ${P.pin}, ${P.baseline} baseline, dispersion ${Math.round(P.disp*100)}% — the settings when the round was started${r.P && r.P._stamp ? ` (curve ${esc(r.P._stamp.curve)}${r.P._stamp.assumed ? ", stamped on first load" : ""})` : ""}. ${res.nScored} of ${c.holes.length} holes scored, ${res.nComplete} fully marked.</div>${(() => { const d = LG.stampDrift(r, null); return d.length ? `<p class="help" style="font-size:12.5px;color:var(--engine)">Model changed since this round: ${esc(d.join("; "))}. It is priced with its own settings on today's data; compare it with newer rounds knowing the yardstick moved.</p>` : ""; })()}`;
   html += `<div class="kpis"><div class="kpi"><div class="v num">${res.score != null ? res.score : "–"}</div><div class="l">your score on the ${res.nScored} scored holes</div></div><div class="kpi engine"><div class="v num">${res.E_tee != null ? fmt(res.E_tee,1) : "–"}</div><div class="l">the engine's expectation from those tees</div></div><div class="kpi"><div class="v num" style="color:${res.sgTotal<0?"var(--engine)":"var(--ok)"}">${res.sgTotal != null ? sgn(res.sgTotal,1) : "–"}</div><div class="l">strokes gained against the engine</div></div></div>`;
   html += `<div class="catbar">${["tee","approach","layup","short","putt","finish","decision"].filter(cc => res.cats[cc].n).map(cc => `<div><div class="v num ${sgClass(res.cats[cc].sg)}">${sgn(res.cats[cc].sg)}</div><div class="l">${LG.CAT_LABEL[cc]} · ${res.cats[cc].n}</div></div>`).join("")}</div>`;
   if (res.nComplete < res.nScored) html += `<p class="help" style="font-size:12.5px;color:var(--mute)">Categories count only the ${res.nComplete} holes with every shot marked; the round's total counts every scored hole.</p>`;
@@ -837,6 +867,209 @@ function roundDetail(r, onDone){
     html += `<tr><td class="n"><a href="#" data-gohole="${c.key}:${h.hole}" style="font-weight:600">${h.hole}</a></td><td class="n">${h.par}</td><td class="n"><b>${a.score != null ? a.score : "–"}</b></td><td class="n">${a.E_tee != null ? fmt(a.E_tee) : "–"}</td><td class="n">${a.sgTotal != null ? cell(a.sgTotal) : ""}</td><td class="n">${cat("decision")}</td><td class="n">${cat("tee")}</td><td class="n">${a.complete && (a.cats.approach.n || a.cats.layup.n) ? cell((a.cats.approach.n ? a.cats.approach.sg : 0) + (a.cats.layup.n ? a.cats.layup.sg : 0)) : ""}</td><td class="n">${a.complete && (a.cats.short.n || a.cats.finish.n) ? cell((a.cats.short.n ? a.cats.short.sg : 0) + (a.cats.finish.n ? a.cats.finish.sg : 0)) : ""}</td><td class="n">${cat("putt")}</td><td style="font-size:12.5px;color:var(--ink2)">${a.kind === "unpriced" ? "not priced" : a.shots.length ? a.shots.map(s => `${s.i+1}·${s.i===0 ? "tee" : s.rYd + "yd " + (s.onGreen ? s.rFt + "ft" : LG.lieWord(s.playedFromHazard ? s.gridLie : s.lie))}${s.clubUsed && !s.onGreen ? " " + esc(s.clubUsed) : ""}${s.pen ? " ⚑" : ""}${s.sg != null ? " " + sgn(s.sg) : ""}`).join(" → ") : "score only"}</td></tr>`; }
   html += `</tbody></table></div>`;
   if (res.flags.length) html += `<p class="help" style="font-size:12.5px;color:var(--mute)">Notes: ${res.flags.slice(0, 12).map(f => `hole ${f.hole}${f.shot ? " shot " + f.shot : ""}: ${esc(f.text)}`).join(" · ")}${res.flags.length > 12 ? ` · and ${res.flags.length - 12} more` : ""}</p>`;
+  return html;
+}
+// ---------------- swing view ----------------
+// Sessions come from the swing harness on the PC (swing/swing_lab.py → <video>.swing.json). Loop compares you with you; it never
+// measures what a phone cannot see (club path, face, attack and launch angles, club and ball speed) and says so.
+const EVT = { OBSERVED: "measured directly", ESTIMATED: "computed through a model or a body scale", INFERRED: "a conclusion from several observations", PREDICTED: "a statistical prediction", UNKNOWN: "not enough evidence: nothing is concluded" };
+function evb(kind){ const k = EVT[kind] ? kind : "UNKNOWN"; return `<span class="ev ${k}" title="${k}: ${EVT[k]}">${k}</span>`; }
+const SW_KINDS = [["range","range"],["warmup","warm-up before a round"],["course","on the course"],["practice","practice swings (no ball)"],["lesson","lesson"]];
+const SW_EVN = { address: "address", toe_up: "toe-up", mid_backswing: "mid-back", top: "top", mid_downswing: "mid-down", impact: "impact", mid_follow_through: "follow", finish: "finish" };
+const SW_FIG_EVENTS = ["address", "top", "impact", "finish"];
+const SW_HEAD = { "face-on": ["tempo_ratio", "downswing_s", "head_sway_impact_in", "pelvis_sway_impact_in", "head_lift_impact_in", "side_bend_impact_deg"], "down-the-line": ["tempo_ratio", "downswing_s", "pelvis_thrust_impact_in", "spine_angle_change_deg", "head_lift_impact_in", "head_thrust_impact_in"] };
+function swHead(view, have){ return (SW_HEAD[view] || ["tempo_ratio", "downswing_s", "head_lift_impact_in"]).filter(k => !have || have(k)).slice(0, 4); }
+function swViewName(v){ return v === "face-on" ? "Face-on" : v === "down-the-line" ? "Down the line" : v === "other" ? "Other angles" : v; }
+function swLabel(k){ const M = SW.METRICS[k]; return M ? M.label : k.replace(/_(in|s|deg)$/, "").replace(/_/g, " "); }
+function swVal(k, v, unit){ if (v == null || !isFinite(v)) return "–"; const M = SW.METRICS[k]; const u = M ? M.unit : unit === "deg" ? "°" : (unit || ""); const dp = M ? M.dp : 2;
+  const s = (+v).toFixed(dp); return u === ":1" ? s + ":1" : u === "°" ? s + "°" : u ? s + " " + u : s; }
+function swDelta(k, v){ if (v == null || !isFinite(v)) return "–"; return (v > 0 ? "+" : v < 0 ? "−" : "") + swVal(k, Math.abs(v)).replace(/:1$/, ""); }
+function saveSwings(){ try { localStorage.setItem("loop.swings", JSON.stringify(state.swings)); localStorage.setItem("loop.practice", JSON.stringify(state.practice)); return true; }
+  catch (e) { toast("This browser's storage is full: export your swing sessions (Your data, below) and delete old ones."); return false; } }
+// what Loop keeps of a harness file: the measurements, the events, the four key poses (the rest of the file stays on the PC)
+function slimSession(s){ delete s.summary; for (const w of s.swings) { if (w.pose) { const p = {}; for (const e of SW_FIG_EVENTS) if (w.pose[e]) p[e] = w.pose[e]; w.pose = p; } } s.imported = s.imported || new Date().toISOString(); return s; }
+function localDate(iso){ const d = new Date(iso); if (isNaN(d)) return null; return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function importSwingJson(v, defaults){
+  let list = Array.isArray(v) ? v : v && v.schema === "loop.swings/1" ? (v.sessions || []) : [v]; let added = 0, replaced = 0, bad = 0, pc = 0, lastId = null;
+  if (v && v.schema === "loop.swings/1" && Array.isArray(v.practice)) for (const p of v.practice) { if (p && p.id && !state.practice.find(x => x.id === p.id)) { state.practice.push(p); pc++; } }
+  for (const raw of list) { let s; try { s = SW.normalize(raw); } catch (e) { bad++; continue; }
+    if (raw.source && raw.source.created && !raw.date) s.date = localDate(raw.source.created) || s.date;   // the round's day is a local day
+    if (defaults) { if (defaults.golfer && (!raw.golfer || raw.golfer === "unknown" || defaults.force)) s.golfer = defaults.golfer; if (defaults.club && !s.club) s.club = defaults.club; if (defaults.kind && !s.kind) s.kind = defaults.kind; if (defaults.date && !s.date) s.date = defaults.date; }
+    slimSession(s); lastId = s.id; const i = state.swings.findIndex(x => x.id === s.id);
+    if (i >= 0) { for (const w of s.swings) { const o = state.swings[i].swings.find(x => x.index === w.index); if (o && o.excluded) w.excluded = true; } state.swings[i] = s; replaced++; } else { state.swings.push(s); added++; } }
+  state.swings.sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.imported || "").localeCompare(a.imported || ""));
+  return { added, replaced, bad, pc, lastId };
+}
+// the analyses of every real round with marks (the ledger prices them in the background; onReady fires when one finishes)
+let swingRerender = null;
+function realAnalyses(onReady){
+  const out = []; let pending = 0;
+  for (const r of state.rounds) { if (r.sample || r.legacy || !course_(r.course) || !Object.values(r.holes || {}).some(x => (x.shots || []).length >= 2 || x.score != null)) continue;
+    const L = state.ledger[r.id]; if (L && L.res) out.push(L.res); else { pending++; if (onReady) ledgerRound(r, (res, done) => { if (done && !swingRerender) swingRerender = requestAnimationFrame(() => { swingRerender = null; onReady(); }); }); } }
+  out.pending = pending; return out;
+}
+const SW_BONES = [[5,6],[11,12],[5,11],[6,12],[5,7],[7,9],[6,8],[8,10],[11,13],[13,15],[12,14],[14,16],[15,19],[16,20],[15,17],[16,18]];
+function swingFigure(pose, name){
+  const p = pose && pose[name]; const cap = `<figcaption>${SW_EVN[name] || name}</figcaption>`;
+  if (!p) return `<figure><svg viewBox="0 0 1 1" role="img" aria-label="${name}: no pose"></svg>${cap}</figure>`;
+  const ok = i => p[i] && p[i][0] != null && p[i][1] != null; const col = (a, b) => a % 2 && b % 2 ? "var(--plan)" : !(a % 2) && !(b % 2) && a > 4 ? "var(--engine)" : "var(--ink2)";
+  let g = SW_BONES.filter(([a, b]) => ok(a) && ok(b)).map(([a, b]) => `<line x1="${p[a][0]}" y1="${p[a][1]}" x2="${p[b][0]}" y2="${p[b][1]}" stroke="${col(a, b)}"/>`).join("");
+  const head = ok(3) && ok(4) ? [(p[3][0] + p[4][0]) / 2, (p[3][1] + p[4][1]) / 2] : ok(0) ? p[0] : null; if (head) g += `<circle cx="${head[0].toFixed(3)}" cy="${head[1].toFixed(3)}" r="0.045" fill="none" stroke="var(--ink2)"/>`;
+  if (ok(9) && ok(10)) g += `<circle cx="${((p[9][0] + p[10][0]) / 2).toFixed(3)}" cy="${((p[9][1] + p[10][1]) / 2).toFixed(3)}" r="0.022" fill="var(--ink)"/>`;
+  return `<figure><svg viewBox="-0.06 -0.06 1.12 1.12" preserveAspectRatio="xMidYMid meet" role="img" aria-label="stick figure at ${SW_EVN[name] || name}" style="stroke-width:2;stroke-linecap:round"><g vector-effect="non-scaling-stroke">${g.replace(/<line /g, '<line vector-effect="non-scaling-stroke" ').replace(/<circle /g, '<circle vector-effect="non-scaling-stroke" ')}</g></svg>${cap}</figure>`;
+}
+function metricRow(k, m){
+  if (!m.available) return `<tr><td>${esc(swLabel(k))}</td><td class="n">–</td><td>${evb("UNKNOWN")}</td><td><span class="sub">${esc(m.reason || "not measured")}</span></td></tr>`;
+  return `<tr><td>${esc(swLabel(k))}</td><td class="n">${swVal(k, m.value, m.unit)}${m.sigma != null ? ` <span class="sub">± ${swVal(k, m.sigma, m.unit)}</span>` : ""}</td><td>${evb(m.evidence)}<span class="sub">tier ${m.tier} · ${esc(m.confidence || "")}</span></td><td><span class="sub">${esc(m.note || "")}</span></td></tr>`;
+}
+function cmpRow(k, c, st){
+  const today = c.today != null ? c.today : st && st.mean; const n = c.n || (st && st.n) || 0;
+  const verdict = c.verdict === "baseline forming" ? `baseline forming<span class="sub">${esc(c.need || "")}</span>` : c.verdict === "too few swings today" ? `too few swings in this session<span class="sub">needs ${SW.RULES.minTodaySwings}</span>`
+    : c.verdict === "within your normal" ? `within your normal<span class="sub">${swDelta(k, c.delta)} (z ${fmt(c.z, 1)}; the camera resolves ±${swVal(k, c.mdc)})</span>`
+    : /than normal/.test(c.verdict) ? `<b style="color:var(--engine)">${c.verdict}</b><span class="sub">${swDelta(k, c.delta)}, z ${fmt(c.z, 1)} — beyond your swing-to-swing and day-to-day spread and the camera's ±${swVal(k, c.mdc)}</span>` : esc(c.verdict);
+  return `<tr><td>${esc(swLabel(k))}</td><td class="n">${swVal(k, today)}<span class="sub">n ${n}</span></td><td class="n">${c.normal != null ? swVal(k, c.normal) + `<span class="sub">${c.nBase} swings, ${c.nSessions} sessions</span>` : "–"}</td><td>${evb(c.evidence)} ${verdict}</td></tr>`;
+}
+function sessionViews(s){ const n = {}; for (const w of s.swings) { const v = w.view || "other"; n[v] = (n[v] || 0) + (w.excluded ? 0 : 1); } return n; }
+function compareBlock(s){
+  const st = SW.sessionStats(s, true); const views = Object.keys(st); if (!views.length) return `<p class="help">No measurement in this session survived the checks.</p>`;
+  if (s.golfer !== "me") return `<p class="help">${s.golfer === "other" ? "Someone else's swing" : "Whose swing this is is not set"}: it is measured below but not compared with your normal and not counted in it. Set “Who” to you if it is yours.</p>`;
+  const { out } = SW.todayVsNormal(state.swings, s); let html = "";
+  for (const v of views) { const cv = out[v] || {}; const keys = Object.keys(cv); const head = swHead(v, k => cv[k] && cv[k].verdict !== "not measured"); const rest = keys.filter(k => !head.includes(k) && cv[k].verdict !== "not measured");
+    const row = k => cmpRow(k, cv[k], st[v][k]);
+    html += `<div class="tablewrap"><table><thead><tr><th>${esc(v)} · ${sessionViews(s)[v] || 0} swings</th><th class="n">This session</th><th class="n">Your normal</th><th>Verdict</th></tr></thead><tbody>${head.map(row).join("")}</tbody></table></div>`;
+    if (rest.length) html += `<details style="margin:-4px 0 10px"><summary style="cursor:pointer;color:var(--ink2);font-size:13px">${rest.length} more measurement${rest.length === 1 ? "" : "s"} from this view</summary><div class="tablewrap"><table><tbody>${rest.map(row).join("")}</tbody></table></div></details>`; }
+  return html;
+}
+function knowsBlock(analyses, h1, h2){
+  const base = SW.baseline(state.swings); const mine = state.swings.filter(s => s.golfer === "me"); const items = [];
+  if (!mine.length) items.push(["UNKNOWN", "Nothing about your swing yet: no session of yours has been added. Record one (below) and the first one starts your normal."]);
+  for (const v in base) { const keys = swHead(v, k => base[v][k]); const ready = keys.filter(k => base[v][k].nSwings >= SW.RULES.minBaseSwings && base[v][k].nSessions >= SW.RULES.minBaseSessions);
+    for (const k of ready) { const b = base[v][k]; items.push(["OBSERVED", `${swViewName(v)}: your normal ${swLabel(k).toLowerCase()} is <b>${swVal(k, b.center)}</b>, swing to swing ±${swVal(k, b.within)}${b.between != null ? `, day to day ±${swVal(k, b.between)}` : ""} (${b.nSwings} swings over ${b.nSessions} sessions).`]); }
+    const forming = keys.filter(k => !ready.includes(k)); if (forming.length) { const b = base[v][forming[0]]; items.push(["UNKNOWN", `${swViewName(v)}: your normal is still forming — ${b.nSwings} swing${b.nSwings === 1 ? "" : "s"} over ${b.nSessions} session${b.nSessions === 1 ? "" : "s"}; it needs ${SW.RULES.minBaseSwings} over ${SW.RULES.minBaseSessions}.`]); } }
+  const last = mine[0]; if (last) { const { out } = SW.todayVsNormal(state.swings, last); const diffs = []; for (const v in out) for (const k in out[v]) if (/than normal/.test(out[v][k].verdict)) diffs.push(`${swLabel(k).toLowerCase()} ${out[v][k].verdict} (${swDelta(k, out[v][k].delta)})`);
+    if (diffs.length) items.push(["INFERRED", `Your latest session (${esc(last.date || "undated")}) differs from your normal: ${diffs.slice(0, 3).join("; ")}.`]); }
+  for (const h of [h1, h2]) items.push([h.evidence, `${h.id}: ${h.status === "insufficient" ? "not testable yet" : h.status} — ${esc(h.statement.replace(/\.$/, ""))}.`]);
+  const sh = SW.shotRows(analyses); items.push([sh.length ? "OBSERVED" : "UNKNOWN", sh.length ? `${sh.length} full shot${sh.length === 1 ? "" : "s"} with a measured miss in ${analyses.length} round${analyses.length === 1 ? "" : "s"} — the shots every swing reading is checked against.` : "No marked full shots yet: swing readings cannot be checked against where the ball went until rounds are marked."]);
+  return `<div class="rev" style="grid-template-columns:1fr"><section><h3>What Loop knows about your swing</h3>${items.map(([k, t]) => `<p>${evb(k)} ${t}</p>`).join("")}</section></div>`;
+}
+function hypCard(h){
+  const st = h.status === "supported" ? "supported" : h.status === "insufficient" ? "insufficient" : "not";
+  const H = SW.HYPOTHESES.find(x => x.id === h.id) || {};
+  return `<div class="hyp"><div><span class="st ${st}">${h.id} · ${h.status === "insufficient" ? "not testable yet" : h.status}</span> ${evb(h.evidence)}</div><p style="margin:6px 0">${esc(h.statement)}</p><p class="help" style="margin:0;font-size:13px">${esc(h.text)}</p>
+    <p class="help" style="margin:6px 0 0;font-size:12px;color:var(--mute)">Registered ${esc(h.registered)} before any data. X: ${esc(H.x || "")}. Y: ${esc(H.y || "")}. Test: ${esc(H.test || "")}. It decides ${esc(H.decides || "")}.</p></div>`;
+}
+function practiceBlock(G){
+  const lab = id => { const n = G.nodes.find(x => x.id === id); return n ? n.label : id; };
+  let html = `<h2>Practice changes</h2><p class="help" style="font-size:13px;color:var(--ink2)">Note a change when you start it (a drill, a feel, a lesson's point). Loop then follows the chain the change has to travel: the swing measurement, where your full shots go, and what you score — so a change that only <i>looks</i> better is not mistaken for one that <i>plays</i> better.</p>`;
+  html += `<div class="row"><input type="date" id="pcDate" value="${today()}"><input type="text" id="pcWhat" placeholder="what changed (e.g. slower takeaway drill)" style="flex:1;min-width:180px"><label style="font-size:13px;color:var(--ink2)">watch <select id="pcMetric">${Object.keys(SW.METRICS).map(k => `<option value="${k}">${esc(swLabel(k))}</option>`).join("")}</select></label><button id="pcAdd">Add</button></div>`;
+  for (const pc of state.practice.slice().sort((a, b) => (b.date || "").localeCompare(a.date || ""))) {
+    const e1 = G.edges.find(e => e.from === "pc:" + pc.id), e2 = G.edges.find(e => e.from === "swc:" + pc.id), e3 = G.edges.find(e => e.from === "shc:" + pc.id);
+    const step = (e, what) => e ? `<p style="margin:4px 0">${evb(e.kind)} <b>${what}</b> ${esc(lab(e.to))} — <span style="color:var(--ink2)">${e.confidence}${e.evidence && e.evidence.p != null ? `, p = ${e.evidence.p}` : ""}</span></p>` : "";
+    html += `<div class="hyp"><div class="row" style="margin:0"><b>${esc(pc.date)}</b><span>${esc(pc.what)}</span><span class="chip">${esc(swLabel(pc.metric || "tempo_ratio"))}</span><button class="x" data-pcdel="${esc(pc.id)}" title="Delete this practice change" style="margin-left:auto">×</button></div>
+      ${step(e1, "Swing:")}${step(e2, "Shots:")}${step(e3, "Scores:")}${e3 && e3.looksVsPlays ? `<p style="margin:6px 0 0;font-size:13px">So far: <b>${esc(e3.looksVsPlays)}</b>.</p>` : `<p class="help" style="margin:6px 0 0;font-size:12.5px;color:var(--mute)">Each link needs sessions or rounds on both sides of ${esc(pc.date)} before it says anything (6 swings, 10 shots, 4 rounds a side).</p>`}</div>`; }
+  return html;
+}
+function edgesBlock(G){
+  if (!G.edges.length) return "";
+  const lab = id => { const n = G.nodes.find(x => x.id === id); return n ? n.label : id; };
+  const rows = G.edges.slice().sort((a, b) => String(b.timestamp || "").localeCompare(String(a.timestamp || ""))).slice(0, 40);
+  return `<details><summary style="cursor:pointer;font-weight:600;margin:18px 0 6px">The evidence behind it (${G.edges.length} link${G.edges.length === 1 ? "" : "s"}${G.edges.length > 40 ? ", newest 40 shown" : ""})</summary><p class="help" style="font-size:12.5px;color:var(--mute)">Every link carries its evidence, its sample size, a confidence, a date and its source. Same-day links are co-occurrence, not cause.</p><div class="tablewrap"><table><thead><tr><th>From</th><th>Link</th><th>To</th><th>Evidence</th><th class="n">n</th><th>Confidence</th><th>Source</th><th>When</th></tr></thead><tbody>${rows.map(e => `<tr><td>${esc(lab(e.from))}</td><td>${esc(e.relation)}</td><td>${esc(lab(e.to))}</td><td title="${esc(JSON.stringify(e.evidence)).replace(/"/g, "&quot;")}">${evb(e.kind)}</td><td class="n">${e.n == null ? "–" : e.n}</td><td>${esc(e.confidence)}</td><td style="font-size:12px;color:var(--ink2)">${esc(e.source)}</td><td style="font-size:12px">${esc(String(e.timestamp || "").slice(0, 10))}</td></tr>`).join("")}</tbody></table></div></details>`;
+}
+function sessionDetail(s){
+  const links = SW.linkShots(s, state.rounds);
+  let html = `<h2 style="margin-top:22px">${esc(s.date || "Undated")} · ${esc(s.source && s.source.file || "session")}</h2>`;
+  html += `<div class="row"><label>Who <select data-swset="golfer"><option value="me" ${s.golfer === "me" ? "selected" : ""}>me</option><option value="other" ${s.golfer !== "me" && s.golfer !== "unknown" ? "selected" : ""}>someone else</option><option value="unknown" ${s.golfer === "unknown" ? "selected" : ""}>not sure</option></select></label>
+    <label>Club <select data-swset="club"><option value="">—</option>${D.clubs.map(c => `<option ${s.club === c.name ? "selected" : ""}>${c.name}</option>`).join("")}</select></label>
+    <label>Where <select data-swset="kind"><option value="">—</option>${SW_KINDS.map(([v, l]) => `<option value="${v}" ${s.kind === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    <label>Day <input type="date" data-swset="date" value="${esc(s.date || "")}"></label></div>`;
+  const src = s.source || {}, an = s.analysis || {};
+  html += `<p class="help" style="font-size:12.5px;color:var(--mute)">${src.fps ? `${Math.round(src.fps)} fps${src.fps_used && src.fps_used !== src.fps ? ` (analysed at ${Math.round(src.fps_used)})` : ""}` : ""}${src.size ? ` · ${src.size[0]}×${src.size[1]}` : ""}${an.backend ? ` · pose: ${esc(an.backend)}` : ""} · ${s.swings.length} swing${s.swings.length === 1 ? "" : "s"} found${(s.rejected || []).length ? `, ${s.rejected.length} motion${s.rejected.length === 1 ? "" : "s"} rejected as not a swing` : ""}${src.created ? ` · filmed ${esc(new Date(src.created).toLocaleString())}` : " · the video carries no recording time"}${s.harness ? ` · harness ${esc(s.harness)}` : ""}.${(s.notes || []).length ? " " + esc(s.notes.join(" ")) : ""}</p>`;
+  html += compareBlock(s);
+  html += `<h3 style="margin:16px 0 4px">Swing by swing</h3>`;
+  for (const w of s.swings) { const L = links.find(x => x.swing === w.index); const r = L && L.round ? roundById(L.round) : null;
+    const avail = Object.keys(w.metrics).filter(k => w.metrics[k].available && SW.METRICS[k]);
+    html += `<div style="border-top:1px solid var(--rule);padding:8px 0"><div class="row" style="margin:0"><b>Swing ${w.index + 1}</b><span style="color:var(--ink2);font-size:13px">${esc(w.view || "")}${w.view_info && w.view_info.oblique ? " (oblique)" : ""} · ${esc(w.handedness || "?")}-handed · impact at ${fmt(w.t_impact, 2)} s${(w.event_flags || []).length ? ` · <span title="${esc(w.event_flags.join("; "))}">${w.event_flags.length} flag${w.event_flags.length === 1 ? "" : "s"}</span>` : ""}</span>
+      ${r ? `<a href="#" data-gohole="${r.course}:${L.hole}" style="font-size:13px">linked: ${esc(course_(r.course).name)} hole ${L.hole}, shot ${L.shot + 1} (${L.dt} s after the mark)</a>` : L && L.day && L.day.length ? `<span style="font-size:12.5px;color:var(--mute)">same day as ${L.day.length} round${L.day.length === 1 ? "" : "s"} (not linked to one shot)</span>` : ""}
+      <label style="margin-left:auto;font-size:12.5px;color:var(--ink2)"><input type="checkbox" data-swex="${w.index}" ${w.excluded ? "checked" : ""}> leave out of my normal</label></div>
+      ${w.pose ? `<div class="figs">${SW_FIG_EVENTS.map(e => swingFigure(w.pose, e)).join("")}</div>` : ""}
+      <p class="help" style="margin:2px 0;font-size:12.5px;color:var(--ink2)">${avail.slice(0, 4).map(k => `${esc(swLabel(k))} <b>${swVal(k, w.metrics[k].value, w.metrics[k].unit)}</b>`).join(" · ") || "No measurement survived the checks for this swing."}</p>
+      <details><summary style="cursor:pointer;font-size:12.5px;color:var(--mute)">every measurement and event time</summary><div class="tablewrap"><table><tbody>${Object.keys(w.metrics).filter(k => !SW.NEVER[k]).map(k => metricRow(k, w.metrics[k])).join("")}</tbody></table></div>
+      <p class="help" style="font-size:12px;color:var(--mute)">Events (s): ${Object.entries(w.events || {}).map(([e, x]) => `${SW_EVN[e] || e} ${fmt(x.t, 3)}`).join(" · ")}${w.scale ? ` · scale from ${esc(w.scale.scale_from || "")}${w.scale.height_assumed ? " (height assumed: set it with --height-in)" : ""}` : ""}${w.track_quality ? ` · tracking ${fmt(w.track_quality.mean_conf, 2)} (wrists ${fmt(w.track_quality.wrist_conf, 2)})` : ""}</p></details></div>`; }
+  const never = Object.keys(SW.NEVER).map(k => { const m = s.swings.length ? s.swings[0].metrics[k] : null; return `<li><b>${esc(SW.NEVER[k])}</b> — ${esc((m && m.reason) || "not measurable from a phone video")}</li>`; });
+  html += `<details><summary style="cursor:pointer;color:var(--ink2);font-size:13px;margin-top:8px">What this does not measure, and why</summary><ul style="font-size:13px;color:var(--ink2)">${never.join("")}</ul></details>`;
+  return html;
+}
+function renderSwing(){
+  const el = $("#viewSwing"); const analyses = realAnalyses(() => { if (state.view === "swing") renderSwing(); });
+  const h1 = SW.evalH1(analyses), h2 = SW.evalH2(state.swings, analyses); const G = SW.graph({ analyses, sessions: state.swings, practice: state.practice });
+  let html = `<h1>Swing</h1><p class="lede">The swing harness on the PC turns a phone video into the swing's timing and body positions, each labelled with how it was obtained. Loop compares you with you — this session against your own normal, never against a tour model — and checks every swing reading against where your ball went. Club path, face angle, attack and launch angles, club and ball speed are not measured: a phone camera cannot see them.</p>`;
+  html += knowsBlock(analyses, h1, h2);
+  // add a session
+  html += `<h2>Add a session</h2><div class="hyp"><p style="margin:0 0 6px;font-size:13.5px">Film face-on (from in front, chest to the camera) or down the line (from behind the hands), the whole body in frame, phone still, 120 or 240 fps if the phone offers it. On the PC: <code>python swing/swing_lab.py analyze VIDEO --golfer me --club 7-iron</code> writes <code>VIDEO.swing.json</code> next to the video. Add that file here.</p>
+    <div class="row"><input type="file" id="swFile" accept=".json,application/json" multiple><label>Who <select id="swWho"><option value="">as the file says</option><option value="me">me</option><option value="other">someone else</option></select></label><label>Club <select id="swClub"><option value="">—</option>${D.clubs.map(c => `<option>${c.name}</option>`).join("")}</select></label><label>Where <select id="swKind"><option value="">—</option>${SW_KINDS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label></div>
+    <details><summary style="cursor:pointer;font-size:12.5px;color:var(--mute)">or paste a session's text</summary><textarea id="swPaste" placeholder='{"schema": "loop.swing/1", ...}'></textarea><div style="margin-top:6px"><button id="swPasteGo">Add what is pasted</button></div></details></div>`;
+  // the latest / open session
+  const mine = state.swings; const open = state.openSwing ? mine.find(s => s.id === state.openSwing) : null;
+  html += `<h2>Sessions (${mine.length})</h2>`;
+  if (!mine.length) html += `<p class="empty" style="padding:20px">No swing sessions yet.</p>`;
+  else html += `<div class="list">${mine.map(s => { const sv = sessionViews(s); const st = SW.sessionStats(s, true); let tempo = null; for (const v in st) if (st[v].tempo_ratio) tempo = st[v].tempo_ratio.mean;
+    return `<div class="r ${open && open.id === s.id ? "pick" : ""}"><span class="when">${esc(s.date || "undated")}</span><span>${esc(s.club || "club?")}${s.kind ? ` · ${esc((SW_KINDS.find(k => k[0] === s.kind) || [0, s.kind])[1])}` : ""} · ${Object.entries(sv).map(([v, n]) => `${n} ${esc(v)}`).join(", ")}${s.golfer !== "me" ? ` <span class="chip">${s.golfer === "unknown" ? "whose?" : "not you"}</span>` : ""}</span><span style="color:var(--ink2)">${tempo != null ? "tempo " + swVal("tempo_ratio", tempo) : ""}</span><span class="tools"><button data-swopen="${esc(s.id)}">${open && open.id === s.id ? "Close" : "Open"}</button><button data-swdel="${esc(s.id)}" class="quiet">${state.confirmSwDel === s.id ? "Really delete?" : "Delete"}</button></span></div>`; }).join("")}</div>`;
+  if (open) html += sessionDetail(open);
+  // experiments
+  html += `<h2>What Loop is testing</h2><p class="help" style="font-size:13px;color:var(--ink2)">Two questions written down before any data, each tested only when the data allow, each tied to what Loop would do differently. Until a test passes Loop does not act on it.</p>${hypCard(h1)}${hypCard(h2)}`;
+  html += practiceBlock(G);
+  html += edgesBlock(G);
+  // the data
+  html += `<h2>Your data</h2><p class="help" style="font-size:13px;color:var(--ink2)">Swing sessions and practice notes live in this browser only (the videos stay on the PC). Copy this text into another copy of Loop's Swing view to carry them over.</p>
+    <textarea id="swJson">${esc(JSON.stringify({ schema: "loop.swings/1", sessions: state.swings, practice: state.practice }))}</textarea>
+    <p class="help"><button id="swImport">Import what is pasted above</button> ${IN_ARTIFACT ? "" : `<button id="swDownload">Download swings.json</button>`}</p>`;
+  el.innerHTML = html;
+  // bindings
+  const bind = (id, fn) => { const e = $("#" + id); if (e) e.addEventListener("click", fn); };
+  const defaults = () => ({ golfer: $("#swWho").value || null, club: $("#swClub").value || null, kind: $("#swKind").value || null, force: !!$("#swWho").value });
+  const done = (r) => { if (r.added || r.replaced || r.pc) { saveSwings(); if (r.lastId && r.added + r.replaced === 1) state.openSwing = r.lastId; renderSwing(); } toast(r.added || r.replaced || r.pc ? `Added ${r.added} session${r.added === 1 ? "" : "s"}${r.replaced ? `, updated ${r.replaced}` : ""}${r.pc ? `, ${r.pc} practice note${r.pc === 1 ? "" : "s"}` : ""}${r.bad ? ` (${r.bad} not a Loop swing file)` : ""}.` : "Nothing added: that is not a Loop swing session (schema loop.swing/1)."); };
+  const fi = $("#swFile"); if (fi) fi.addEventListener("change", async () => { const tot = { added: 0, replaced: 0, bad: 0, pc: 0, lastId: null }; for (const f of fi.files) { try { const r = importSwingJson(JSON.parse(await f.text()), defaults()); for (const k of ["added", "replaced", "bad", "pc"]) tot[k] += r[k]; tot.lastId = r.lastId || tot.lastId; } catch (e) { tot.bad++; } } done(tot); });
+  bind("swPasteGo", () => { try { done(importSwingJson(JSON.parse($("#swPaste").value), defaults())); } catch (e) { toast("Could not read that as JSON (" + e.message + ")."); } });
+  bind("swImport", () => { try { done(importSwingJson(JSON.parse($("#swJson").value), null)); } catch (e) { toast("Could not read that as JSON (" + e.message + ")."); } });
+  bind("swDownload", () => { const blob = new Blob([JSON.stringify({ schema: "loop.swings/1", sessions: state.swings, practice: state.practice }, null, 1)], { type: "application/json" }); const a2 = document.createElement("a"); a2.href = URL.createObjectURL(blob); a2.download = "loop-swings-" + today() + ".json"; document.body.appendChild(a2); a2.click(); setTimeout(() => { URL.revokeObjectURL(a2.href); a2.remove(); }, 500); });
+  $$("[data-swopen]").forEach(b => b.addEventListener("click", () => { state.openSwing = state.openSwing === b.dataset.swopen ? null : b.dataset.swopen; state.confirmSwDel = null; renderSwing(); }));
+  $$("[data-swdel]").forEach(b => b.addEventListener("click", () => { const id = b.dataset.swdel; if (state.confirmSwDel === id) { state.swings = state.swings.filter(s => s.id !== id); if (state.openSwing === id) state.openSwing = null; state.confirmSwDel = null; saveSwings(); renderSwing(); toast("Session deleted."); } else { state.confirmSwDel = id; renderSwing(); setTimeout(() => { if (state.confirmSwDel === id) { state.confirmSwDel = null; if (state.view === "swing") renderSwing(); } }, 4000); } }));
+  $$("[data-swset]").forEach(i => i.addEventListener("change", () => { if (!open) return; const k = i.dataset.swset; open[k] = i.value || (k === "golfer" ? "unknown" : null); saveSwings(); renderSwing(); }));
+  $$("[data-swex]").forEach(i => i.addEventListener("change", () => { if (!open) return; const w = open.swings.find(x => x.index === +i.dataset.swex); if (w) { w.excluded = i.checked; saveSwings(); renderSwing(); } }));
+  bind("pcAdd", () => { const what = $("#pcWhat").value.trim(); if (!what) { toast("Say what changed."); return; } state.practice.push({ id: "pc_" + Date.now().toString(36), date: $("#pcDate").value || today(), what, metric: $("#pcMetric").value }); saveSwings(); renderSwing(); });
+  $$("[data-pcdel]").forEach(b => b.addEventListener("click", () => { state.practice = state.practice.filter(p => p.id !== b.dataset.pcdel); saveSwings(); renderSwing(); }));
+  $$("#viewSwing [data-gohole]").forEach(x => x.addEventListener("click", ev => { ev.preventDefault(); const [ck, hn] = x.dataset.gohole.split(":"); if (ck !== state.course) { state.course = ck; store.set("course", ck); } state.hole = +hn; store.set("hole", state.hole); state.tap = null; renderHeader(); setView("hole"); }));
+}
+// ---- Today mode on the hole page: today's shots (and today's swing) against your normal, and what that does to the call here ----
+const todayCache = {};
+function todayCard(c, h, r){
+  const ar = activeRound(); if (!ar || ar.course !== c.key || !(r.kind === "tee" || (r.kind === "par3" && r.approach && r.approach.best))) return "";
+  const holes = {}; for (const hn in (ar.holes || {})) { const hh = c.holes.find(x => x.hole === +hn); const rec = ar.holes[hn]; if (!hh || hh.nodata || !rec || (rec.shots || []).length < 2) continue; holes[hn] = ledgerHole(ar, hh); }
+  const hist = realAnalyses(() => { if (state.view === "hole") renderHole(); }).filter(a => a.id !== ar.id);
+  const ts = SW.todayShots({ id: ar.id, date: ar.date, holes }, hist);
+  const club = r.kind === "tee" ? r.options[0].club : r.approach.club; const g = SW.clubGroup(club); const x = g && ts[g];
+  const sess = state.swings.filter(s => s.golfer === "me" && s.date === ar.date); let swingLine = "";
+  if (sess.length) { const tv = SW.todayVsNormal(state.swings, sess[0]).out; let t = null; for (const v in tv) if (tv[v].tempo_ratio && tv[v].tempo_ratio.verdict !== "not measured") t = tv[v].tempo_ratio;
+    if (t) swingLine = `<div class="why">${evb(t.evidence)} Your swing today (${esc(sess[0].kind ? (SW_KINDS.find(k => k[0] === sess[0].kind) || [0, sess[0].kind])[1] : "session")}, ${t.n} swing${t.n === 1 ? "" : "s"}): tempo ${swVal("tempo_ratio", t.today)} — ${esc(t.verdict)}${t.normal != null ? ` (normal ${swVal("tempo_ratio", t.normal)})` : ""}. Whether tempo should widen the pattern is H2, not tested yet, so the engine does not change for it.</div>`; }
+  if (!x) return swingLine ? `<div class="today"><b>Today</b>${swingLine}</div>` : "";
+  const dir = v => v > 0 ? "right" : "left"; const pctS = v => (Math.abs(v) * 100).toFixed(1) + "%";
+  const vsWhat = x.normalFrom === "your rounds" ? `your normal (${x.nNormal} earlier ${g} shots)` : "the model's line (no earlier rounds to call normal yet)";
+  let html = `<div class="today"><b>Today</b> ${evb(x.enough ? "PREDICTED" : "OBSERVED")} Your ${esc(g)} so far today: ${x.n} shot${x.n === 1 ? "" : "s"}, median ${pctS(x.todayMedPct - x.normalMedPct)} of carry ${dir(x.todayMedPct - x.normalMedPct)} of ${vsWhat}`;
+  const shrinkWhy = `shrunk toward normal by how much your days differ (τ ${pctS(x.tau)} of carry${x.tauFrom === "prior" ? ", Loop's prior until six of your rounds have four such shots" : `, from ${x.nRoundsTau} of your rounds`}: today's shots count as ${x.n} against ${Math.round(x.k)} for normal)`;
+  if (!x.enough) { html += `. Loop moves the target once ${SW.RULES.minTodayShots} shots with these clubs sit at least ${SW.RULES.minShiftYd} yd off normal after being ${shrinkWhy}; now ${Math.abs(Math.round(x.shiftYd))} yd.${swingLine}</div>`; return html; }
+  const tP = SW.todayParams(state.P, ts, club); const key = [ar.id, c.key, h.hole, club, x.shiftPct, phash()].join("|");
+  let T = todayCache[key];
+  if (!T) { const af = altf(c);
+    if (r.kind === "tee") { const o = r.options[0]; const best = E.teeOptions(h, tP, af, { n: 1500, keep: 1, clubs: [club] })[0]; const same = E.teeOptions(h, tP, af, { n: 1500, keep: 1, clubs: [club], aims: [o.best.aim] })[0];
+      T = { kind: "tee", aim: best.best.aim, E: best.best.E, normalAim: o.best.aim, normalE: same.best.E, odds: best.best.odds, normalOdds: same.best.odds }; }
+    else { const a = r.approach; const best = E.approach(h, [0, 0], tP, af, { n: 1200, club }); const same = E.approach(h, [0, 0], tP, af, { n: 1200, club, lats: [a.best.lat], depths: [a.best.depth] });
+      T = { kind: "par3", lat: best.best.lat, depth: best.best.depth, E: best.best.E, normalLat: a.best.lat, normalDepth: a.best.depth, normalE: same.best ? same.best.E : null }; }
+    todayCache[key] = T; }
+  const gain = T.normalE != null ? T.normalE - T.E : null; const tgt = (l, d) => (l === 0 ? "at the pin" : Math.abs(l) + " yd " + (l < 0 ? "left" : "right")) + (d ? ", " + Math.abs(d) + " yd " + (d < 0 ? "short" : "long") : "");
+  html += ` — about ${Math.abs(Math.round(x.shiftYd))} yd ${dir(x.shiftYd)} once shrunk toward normal.`;
+  if (T.kind === "tee") html += T.aim !== T.normalAim ? `<div style="margin-top:6px">If that holds on this tee: <b>${esc(club)} ${aimShort(T.aim)}</b> instead of ${aimShort(T.normalAim)}${gain != null && gain >= 0.005 ? ` — with today's pattern the usual line costs <b>${fmt(gain)}</b> more (${fmt(T.normalE)} vs ${fmt(T.E)})` : ""}.</div>` : `<div style="margin-top:6px">The line holds: even with today's pattern ${esc(club)} ${aimShort(T.aim)} is still the best line here (${fmt(T.E)}).</div>`;
+  else html += T.lat !== T.normalLat || T.depth !== T.normalDepth ? `<div style="margin-top:6px">If that holds: aim <b>${tgt(T.lat, T.depth)}</b> instead of ${tgt(T.normalLat, T.normalDepth)}${gain != null && gain >= 0.005 ? ` — the usual target costs <b>${fmt(gain)}</b> more with today's pattern` : ""}.</div>` : `<div style="margin-top:6px">The target holds: ${tgt(T.lat, T.depth)} is still best with today's pattern.</div>`;
+  const h1 = SW.evalH1(hist); html += `<div class="why">Why this is a prediction: the engine moved your pattern ${pctS(x.shiftPct)} of carry ${dir(x.shiftPct)} — today's ${x.n} shots ${shrinkWhy} — assuming today's miss continues. Whether an early miss persists for you is H1: ${h1.status === "insufficient" ? `not testable yet (${h1.groups[0].n} + ${h1.groups[1].n} days; it needs ${SW.HYPOTHESES[0].minPerGroup} of each)` : h1.status}. Misses are read against the line the engine gave for each shot. The call above stays the engine's normal one.</div>${swingLine}</div>`;
   return html;
 }
 // ---------------- audit view ----------------
@@ -889,7 +1122,7 @@ function renderSettings(){
     <label>Short game vs scratch <select id="s_short_game_extra"><option value="0" ${P.short_game_extra==0?"selected":""}>scratch (57% up-and-down)</option><option value="0.2" ${P.short_game_extra==0.2?"selected":""}>+0.2 strokes a chip</option><option value="0.4" ${P.short_game_extra==0.4?"selected":""}>+0.4</option><option value="0.6" ${P.short_game_extra==0.6?"selected":""}>+0.6</option><option value="0.8" ${P.short_game_extra==0.8?"selected":""}>+0.8</option></select></label>
     <label>Baseline curve <select id="s_baseline"><option value="scratch" ${P.baseline==="scratch"?"selected":""}>scratch amateur</option><option value="tour" ${P.baseline==="tour"?"selected":""}>PGA Tour (Broadie)</option></select></label>
     <label>Desert costs <select id="s_penalty"><option value="1" ${P.penalty==1?"selected":""}>a stroke and a drop (local rule)</option><option value="0.5" ${P.penalty==0.5?"selected":""}>half a stroke (often playable)</option><option value="0" ${P.penalty==0?"selected":""}>nothing beyond a rough lie</option></select></label>
-    <p class="help">Dispersion at 100% is the model calibrated to Arccos scratch-golfer green hits (83/71/63/47/36% from 100/130/150/200/240 yards); a 3-handicap sits a little wider, try 110%. The short-game setting adds strokes to every chip, pitch and bunker shot inside 50 yards — it is the one number the go/lay-up verdicts turn on.</p>
+    <p class="help">Dispersion at 100% is the model calibrated to Arccos scratch-golfer green hits (83/71/63/47/36% from 100/130/150/200/240 yards on generic greens). On the mapped greens of your nine courses the same pattern hits 75/64/57/43/34% from those distances (fairway, middle pin; pipeline/audit_model.py), so it is not a 3-handicap calibration and nothing here measures yours yet: your marked rounds will. The baseline curve is the scratch amateur's; strokes gained in Rounds are against it. The short-game setting adds strokes to every chip, pitch and bunker shot inside 50 yards — it is the one number the go/lay-up verdicts turn on.</p>
   </section>
   <section><h3>Your clubs</h3>
     <div class="tablewrap"><table class="clubs"><thead><tr><th>Club</th><th class="n">Carry</th><th class="n">Roll firm</th><th class="n">Roll soft</th></tr></thead><tbody>
@@ -934,8 +1167,8 @@ Driver, 302, 328
 function correctionsJson(){ const out = {}; for (const k in state.overrides) { const [ck, hn] = k.split(":"); const o = state.overrides[k]; (out[ck] = out[ck] || {})[hn] = { green_latlon: o.latlon, note: "moved in Loop on " + new Date().toISOString().slice(0,10) }; } return out; }
 function saveP(){ const keep = {}; for (const k in state.P) if (JSON.stringify(state.P[k]) !== JSON.stringify(D.defaults[k])) keep[k] = state.P[k]; store.set("P", keep); state.results = {}; renderHeader(); if (state.view==="hole") renderHole(); startBackground(); }
 // ---------------- views ----------------
-function setView(v){ state.view = v; for (const id of ["hole","round","rounds","audit","settings"]) $("#view"+id[0].toUpperCase()+id.slice(1)).hidden = id!==v; renderHeader();
-  if (v==="hole") renderHole(); if (v==="round") renderRound(); if (v==="rounds") renderRounds(); if (v==="audit") renderAudit(); if (v==="settings") renderSettings(); if (v==="round"||v==="audit") startBackground(); window.scrollTo(0,0); }
+function setView(v){ state.view = v; for (const id of ["hole","round","rounds","swing","audit","settings"]) $("#view"+id[0].toUpperCase()+id.slice(1)).hidden = id!==v; renderHeader();
+  if (v==="hole") renderHole(); if (v==="round") renderRound(); if (v==="rounds") renderRounds(); if (v==="swing") renderSwing(); if (v==="audit") renderAudit(); if (v==="settings") renderSettings(); if (v==="round"||v==="audit") startBackground(); window.scrollTo(0,0); }
 function startBackground(){ const c = course(); computeCourse(c, (done, total, complete) => { if (state.view==="round") renderRound(); if (state.view==="audit") renderAudit(); }); }
 $("#condChip").addEventListener("click", () => { const q = $("#quick"); const open = q.hidden; q.hidden = !open; $("#condChip").setAttribute("aria-expanded", String(open)); if (open) { $("#q_wind").value = state.P.wind_mph; $("#q_from").value = state.P.wind_from; $("#q_temp").value = state.P.temp_f; $("#q_turf").value = state.P.setting; $("#q_pin").value = state.P.pin; } });
 $("#q_apply").addEventListener("click", () => { state.P.wind_mph = +$("#q_wind").value || 0; state.P.wind_from = +$("#q_from").value || 0; state.P.temp_f = +$("#q_temp").value || 75; state.P.setting = $("#q_turf").value; state.P.pin = $("#q_pin").value; $("#quick").hidden = true; $("#condChip").setAttribute("aria-expanded","false"); saveP(); toast("Conditions applied: " + windText() + ", " + state.P.temp_f + "°F, " + state.P.setting + ", pin " + state.P.pin); });
