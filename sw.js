@@ -1,8 +1,8 @@
 // Loop service worker: app shell cached on install, Esri tiles cached as they are seen (so a hole viewed once works offline).
 // SHELL is a hash of the page, the engine and the data: any rebuild changes this file, the browser installs the new worker, it caches the new
 // shell, drops the old one, takes over the open pages and reloads them (an update, never a first install, has old shell caches to drop).
-const SHELL = "loop-shell-03ea589239"; const TILES = "loop-tiles-v1";
-const SHELL_FILES = ["./", "./index.html", "./engine.js", "./data.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
+const SHELL = "loop-shell-acdc3deaaa"; const TILES = "loop-tiles-v1";
+const SHELL_FILES = ["./", "./index.html", "./engine.js", "./ledger.js", "./data.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil((async () => {
   const old = (await caches.keys()).filter(k => k.startsWith("loop-shell-") && k !== SHELL);

@@ -103,13 +103,14 @@
 
   // ---------- one shot batch ----------
   // Returns typed arrays px, py (metres) for n shots from ball toward aimDeg with the club.
-  function shoot(H, ball, aimDeg, club, n, rand, P, bearing, out) {
+  function shoot(H, ball, aimDeg, club, n, rand, P, bearing, out, fromLieGiven) {
     const a = aimDeg * Math.PI / 180, dx = Math.cos(a), dy = Math.sin(a), nx = -Math.sin(a), ny = Math.cos(a);
     const [head, cross] = windComponents(P, (bearing || 0) + aimDeg);
     const wf = head > 0 ? 1 - P.head_pct_per_mph / 100 * head : 1 + P.tail_pct_per_mph / 100 * (-head);
     const carryW = club.carry * wf, drift = -P.cross_yd_per_mph * cross * Math.pow(club.carry / 300, 2);
-    // lie you are playing from: rough and sand widen the pattern and cost carry (fairway, tee and green are neutral)
-    const fromTee = ball[0] === 0 && ball[1] === 0; const fromLie = fromTee ? L.TEE : lieAt(H, ball[0], ball[1]); const lf = LIEFX[fromLie] || LIEFX[1];
+    // lie you are playing from: rough and sand widen the pattern and cost carry (fairway, tee and green are neutral).
+    // The ledger passes the lie it recorded (or the player corrected) as fromLieGiven; otherwise the grid decides.
+    const fromTee = ball[0] === 0 && ball[1] === 0; const fromLie = fromLieGiven != null ? fromLieGiven : fromTee ? L.TEE : lieAt(H, ball[0], ball[1]); const lf = LIEFX[fromLie] || LIEFX[1];
     const sLat = Math.max(2.5, club.carry * club.latPct * P.disp * lf.disp), sDist = Math.max(2.0, club.carry * club.distPct * P.disp * lf.disp);
     const k = descentK(P, club.name.replace("easy ", ""), club.carry + club.roll);
     const z0 = zAt(H, ball[0], ball[1]);
@@ -152,6 +153,25 @@
     return res;
   }
   function median(a) { const b = Float32Array.from(a).sort(); return b[b.length >> 1]; }
+  // The price of one position: the same rule price() applies to every simulated landing (baseline by lie and plays-like distance, plus the
+  // penalty terms), so a hole's expectation, its price map and the ledger's chain all speak the same currency. lieGiven overrides the grid.
+  function priceAt(h, pos, P, lieGiven) {
+    const H = decodeHole(h); applyPin(H, P); const base = P.baseline;
+    const lie = lieGiven != null ? lieGiven : (pos[0] === 0 && pos[1] === 0 ? L.TEE : lieAt(H, pos[0], pos[1]));
+    const r = Math.hypot(pos[0] - H.pin[0], pos[1] - H.pin[1]) / YD; const dz = H.pinFt - zAt(H, pos[0], pos[1]);
+    const k = descentK(P, null, r); let pl = r + k * dz / 3; if (pl < 5) pl = 5; let s;
+    switch (lie) {
+      case L.GREEN: s = baseAt(lut(base, "green_ft"), r * 3); break;
+      case L.FAIRWAY: case L.TEE: s = baseAt(lut(base, "fairway"), pl); break;
+      case L.ROUGH: case L.OGREEN: s = baseAt(lut(base, "rough"), pl); break;
+      case L.SAND: case L.WASTE: s = baseAt(lut(base, "sand"), pl); break;
+      case L.SCRUB: s = baseAt(lut(base, "rough"), pl) + P.scrub_extra; break;
+      case L.WATER: s = baseAt(lut(base, "rough"), pl) + 1; break;
+      default: s = baseAt(lut(base, "rough"), pl) + P.penalty;
+    }
+    if (lie !== L.GREEN && r < 50) s += P.short_game_extra || 0;
+    return { E: s, r, plays: pl, dz, lie };
+  }
 
   // ---------- tee options for a par 4/5 ----------
   function teeOptions(h, P, altf, opts) {
@@ -184,6 +204,7 @@
     const vx = H.pin[0] - ball[0], vy = H.pin[1] - ball[1]; const distM = Math.hypot(vx, vy); const rem = distM / YD;
     const z0 = zAt(H, ball[0], ball[1]); const dz = H.pinFt - z0; const k = descentK(P, null, rem); const plays = Math.max(5, rem + k * dz / 3);
     const fromTee = ball[0] === 0 && ball[1] === 0;
+    const fromLie = opts && opts.fromLie != null ? opts.fromLie : fromTee ? L.TEE : lieAt(H, ball[0], ball[1]);
     const club = opts && opts.club ? clubParams(opts.club, P, altf) : clubForDistance(plays, P, altf, fromTee);
     const buf = { px: new Float32Array(n), py: new Float32Array(n) }; let best = null; const options = [];
     const ux = vx / distM, uy = vy / distM, rx = -uy, ry = ux;   // r = right-hand normal in frame (right of the shot)
@@ -194,13 +215,13 @@
       const c = Object.assign({}, club); const scale = (tL + k * dz / 3) / Math.max(1e-6, c.carry + c.roll);
       if (c.shortBy != null && scale > 1.02) continue;
       if (c.shortBy == null) { const s = Math.min(scale, 1); c.carry *= s; c.roll *= s; }
-      const rand = mulberry32(P.seed * 1000 + 99); shoot(H, ball, ang, c, n, rand, P, bearing, buf);
+      const rand = mulberry32(P.seed * 1000 + 99); shoot(H, ball, ang, c, n, rand, P, bearing, buf, fromLie);
       const r = price(H, buf.px, buf.py, n, P, base, 0); const o = { lat, depth: dep, E: r.E, odds: r.odds, prox: r.rem * 3, ang, clubScaled: c };
       options.push(o); if (!best || r.E < best.E) best = o;
     }
-    if (best) { const rand = mulberry32(P.seed * 1000 + 99); shoot(H, ball, best.ang, best.clubScaled, n, rand, P, bearing, buf); best.sample = price(H, buf.px, buf.py, n, P, base, keep).sample; }
+    if (best) { const rand = mulberry32(P.seed * 1000 + 99); shoot(H, ball, best.ang, best.clubScaled, n, rand, P, bearing, buf, fromLie); best.sample = price(H, buf.px, buf.py, n, P, base, keep).sample; }
     const fwT = lut(base, "fairway"), rgT = lut(base, "rough");
-    const fromLie = fromTee ? L.TEE : lieAt(H, ball[0], ball[1]); const pen = (LIEFX[fromLie] || LIEFX[1]).pen * (fromLie === 0 ? P.penalty : 1);
+    const pen = (LIEFX[fromLie] || LIEFX[1]).pen * (fromLie === 0 ? P.penalty : 1);
     if (pen) { for (const o of options) o.E += pen; if (best) best.E += pen; }
     return { from: rem, plays, dz, club: club.name, shortBy: club.shortBy || 0, best, options, fromLie, fromPen: pen, curveFairway: baseAt(fwT, plays), curveRough: baseAt(rgT, plays) };
   }
@@ -210,6 +231,7 @@
     if (!h || !h.grid) return null;
     const H = decodeHole(h); applyPin(H, P); const go = approach(h, ball, P, altf, Object.assign({ n: 800 }, opts || {}));
     const base = P.baseline; const n = 700; const buf = { px: new Float32Array(n), py: new Float32Array(n) };
+    const fromLie = opts && opts.fromLie != null ? opts.fromLie : null;   // the lay-up is played from the same (recorded) lie as the go
     const vx = H.pin[0] - ball[0], vy = H.pin[1] - ball[1]; const distM = Math.hypot(vx, vy); const ux = vx / distM, uy = vy / distM, rx = -uy, ry = ux;
     const R = distM / YD; const lays = [];
     for (const leave of [80, 100, 120, 140]) {
@@ -219,7 +241,7 @@
         const tx = H.pin[0] - ux * leave * YD + rx * lat * YD, ty = H.pin[1] - uy * leave * YD + ry * lat * YD;
         const tvx = tx - ball[0], tvy = ty - ball[1]; const tL = Math.hypot(tvx, tvy) / YD; const ang = Math.atan2(tvy, tvx) * 180 / Math.PI;
         const c = clubForDistance(tL, P, altf, false); if (c.shortBy) continue;
-        const rand = mulberry32(P.seed * 1000 + 31); shoot(H, ball, ang, c, n, rand, P, h.bearing || 0, buf);
+        const rand = mulberry32(P.seed * 1000 + 31); shoot(H, ball, ang, c, n, rand, P, h.bearing || 0, buf, fromLie);
         // price each lay-up landing with a simulated wedge from a few representative points (bucket by lie and distance)
         const buckets = {}; let pen = 0;
         for (let i = 0; i < n; i++) {
@@ -239,7 +261,7 @@
           const k2 = lie === L.FAIRWAY || lie === L.TEE ? "fairway" : (lie === L.SAND || lie === L.WASTE) ? "sand" : lie === L.WATER ? "water" : (lie === L.DESERT || lie === L.SCRUB) ? "desert" : lie === L.GREEN ? "green" : "rough";
           shares[k2] += m / n;
         }
-        const E = 1 + Esum / n; const o = { leave, lat, E, club: c.name, shares };
+        const E = 1 + Esum / n + go.fromPen; const o = { leave, lat, E, club: c.name, shares };   // the same from-lie penalty the go carries
         if (!bestL || E < bestL.E) bestL = o;
       }
       if (bestL) lays.push(bestL);
@@ -267,5 +289,5 @@
   }
 
   for (const c of D.courses) for (const h of c.holes) h._key = c.key + ":" + h.hole;
-  window.LoopEngine = { setOverrides, overrideFor, pointInPoly, decodeHole, applyPin, lieAt, zAt, clubParams, clubForDistance, teeOptions, approach, goVsLay, runHole, L, YD, lut, baseAt, windComponents };
+  window.LoopEngine = { setOverrides, overrideFor, pointInPoly, decodeHole, applyPin, lieAt, zAt, clubParams, clubForDistance, teeOptions, approach, goVsLay, runHole, priceAt, L, YD, LIEFX, lut, baseAt, windComponents };
 })();
