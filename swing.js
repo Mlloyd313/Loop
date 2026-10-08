@@ -127,6 +127,34 @@
     return links;
   }
 
+  // ---------- what was observed together: the strike, the place, the shot ----------
+  // Two clocks in the video itself say whether a ball was struck (the harness: clocks.ball = the ball leaving, clocks.sound = the strike
+  // sound). A swing with neither is a practice swing. Neither is guessed: an unchecked swing stays "not checked".
+  function strikeOf(w) {
+    const c = (w && w.clocks) || {}; const b = (c.ball || {}).found, s = (c.sound || {}).strike;
+    if (b === "yes" && s === "yes") return { verdict: "struck (ball left, strike heard)", kind: "OBSERVED", struck: true };
+    if (b === "yes") return { verdict: "struck (ball left)", kind: "OBSERVED", struck: true };
+    if (s === "yes") return { verdict: "struck (strike heard)", kind: "OBSERVED", struck: true };
+    if (b === "none" && s === "none") return { verdict: "no ball left, no strike heard: a practice swing", kind: "OBSERVED", struck: false };
+    if (b === "none" || s === "none") return { verdict: b === "none" ? "ball not seen leaving (sound unsure)" : "no strike heard (ball unsure)", kind: "UNKNOWN", struck: null };
+    return { verdict: "not checked", kind: "UNKNOWN", struck: null };
+  }
+  // where a session was filmed, in four words: a Loop tee box, elsewhere on a hole, near a course (range, practice area, back yard), away
+  function spotKind(s) { const w = (s && s.where) || {}; if (w.hole && w.spot === "tee") return "tee"; if (w.hole) return "hole"; if (w.course) return "near"; if (w.lat != null) return "away"; return "unknown"; }
+  // one record per swing: when, who, where (course, hole, spot, the plan's club there), whether a ball was struck, the timing, and the
+  // marked shot it belongs to when a round of that moment exists — otherwise outcome "unknown". This is the association layer: Loop
+  // stores what it saw together and claims nothing about cause.
+  function associations(sessions, rounds) {
+    const out = [];
+    for (const s of sessions) { const links = linkShots(s, rounds || []); const w = s.where || {};
+      for (const sw of s.swings) { const L = links.find(x => x.swing === sw.index); const m = sw.metrics || {}; const g = k => m[k] && m[k].available ? m[k].value : null;
+        out.push({ session: s.id, swing: sw.index, date: s.date || null, time: swingTime(s, sw), golfer: s.golfer, course: w.course || null, courseName: w.course_name || null, hole: w.hole || null, spot: w.spot || null,
+          spotKind: spotKind(s), dM: w.d_m == null ? null : w.d_m, clubHint: w.club_hint ? w.club_hint.club : null, club: s.club || null, strike: strikeOf(sw), view: sw.view || null, excluded: !!sw.excluded,
+          downswing: g("downswing_s"), tempo: g("tempo_ratio"), tempoSigma: m.tempo_ratio ? m.tempo_ratio.sigma : null, addressUnstable: !!(sw.sampling && sw.sampling.address_unstable),
+          shot: L && L.round ? { round: L.round, hole: L.hole, shot: L.shot, dt: L.dt } : null, outcome: L && L.round ? "linked shot" : "unknown" }); } }
+    return out;
+  }
+
   // ---------- today vs normal from the shots themselves (the ledger) ----------
   const GROUPS = { Driver: "driver", "3-wood": "woods", Hybrid: "woods", "4-iron": "long irons", "5-iron": "long irons", "6-iron": "mid irons", "7-iron": "mid irons", "8-iron": "mid irons", "9-iron": "short irons", PW: "short irons", GW: "wedges", SW: "wedges", LW: "wedges" };
   function clubGroup(c) { return GROUPS[c] || null; }
@@ -204,6 +232,10 @@
       x: "the day's swing session tempo ratio against your normal (|z| ≥ 2 = outside)", y: "the robust spread (MAD) of that day's lateral misses, % of carry",
       test: "permutation test, outside vs within days, two-sided α = 0.05", minPerGroup: 4, alpha: 0.05,
       decides: "whether a tempo reading before a round should widen the engine's pattern for that day" },
+    { id: "H3-tee-vs-elsewhere", registered: "2026-10-07", statement: "Your downswing on a tee box differs from your downswing elsewhere (range, practice area, back yard).",
+      x: "where the swing was filmed, from the phone's position: on a Loop tee box, or anywhere else", y: "the downswing time (top to impact, s) — the one timing the harness reads the same at 30 and 240 fps; your real-time, non-excluded swings only",
+      test: "permutation test on the difference of means, tee vs elsewhere, two-sided α = 0.05; 90% bootstrap interval; the swing is the unit (sessions are one swing each)", minPerGroup: 4, alpha: 0.05,
+      decides: "whether a range session's timing can stand in for the course (Today mode's swing line) or the course itself must be filmed" },
   ];
   function evalH1(analyses) {
     const rows = shotRows(analyses); const byDay = {};
@@ -224,17 +256,24 @@
       if (z == null) continue; const spread = mad(rowsByDate[s.date]); (Math.abs(z) >= 2 ? outside : within).push(spread); }
     return evalGroups(HYPOTHESES[1], outside, within, "days outside your tempo range", "days within it", "% of carry (spread)");
   }
-  function evalGroups(h, a, b, la, lb, unit) {
+  function evalH3(sessions) {
+    const rows = associations(sessions, []).filter(r => r.golfer === "me" && !r.excluded && r.strike.struck !== false && r.downswing != null && r.spotKind !== "unknown");
+    const tee = rows.filter(r => r.spotKind === "tee").map(r => r.downswing), other = rows.filter(r => r.spotKind !== "tee").map(r => r.downswing);
+    return evalGroups(HYPOTHESES[2], tee, other, "swings on a tee box", "swings elsewhere", "s", fmtMs);
+  }
+  function evalGroups(h, a, b, la, lb, unit, fmt) {
+    const F = fmt || fmtN;
     const res = { id: h.id, statement: h.statement, groups: [{ label: la, n: a.length, mean: r3(mean(a)) }, { label: lb, n: b.length, mean: r3(mean(b)) }], unit, registered: h.registered, evaluated: new Date().toISOString().slice(0, 10) };
     if (a.length < h.minPerGroup || b.length < h.minPerGroup) { res.status = "insufficient"; res.evidence = "UNKNOWN"; res.text = `Not testable yet: ${a.length} ${la} and ${b.length} ${lb}; the test needs ${h.minPerGroup} of each. Nothing is concluded.`; return res; }
     const pt = permutationTest(a, b, 4000, 11), ci = bootstrapCI(a, b, 2000, 11);
     res.diff = r3(pt.diff); res.p = r3(pt.p); res.ci90 = ci.map(r3);
     res.status = pt.p < h.alpha ? "supported" : "not supported"; res.evidence = pt.p < h.alpha ? "INFERRED" : "OBSERVED";
-    res.text = pt.p < h.alpha ? `Supported for you: ${la} average ${fmtN(mean(a))} vs ${fmtN(mean(b))} for ${lb} (difference ${fmtN(pt.diff)}, 90% interval ${fmtN(ci[0])} to ${fmtN(ci[1])}, p = ${pt.p.toFixed(3)}, n = ${a.length} + ${b.length}).`
-      : `Not supported (yet): difference ${fmtN(pt.diff)} (90% interval ${fmtN(ci[0])} to ${fmtN(ci[1])}), p = ${pt.p.toFixed(2)}, n = ${a.length} + ${b.length}. Loop does not act on it.`;
+    res.text = pt.p < h.alpha ? `Supported for you: ${la} average ${F(mean(a))} vs ${F(mean(b))} for ${lb} (difference ${F(pt.diff)}, 90% interval ${F(ci[0])} to ${F(ci[1])}, p = ${pt.p.toFixed(3)}, n = ${a.length} + ${b.length}).`
+      : `Not supported (yet): ${la} average ${F(mean(a))} vs ${F(mean(b))} for ${lb} — difference ${F(pt.diff)} (90% interval ${F(ci[0])} to ${F(ci[1])}), p = ${pt.p.toFixed(2)}, n = ${a.length} + ${b.length}. Loop does not act on it.`;
     return res;
   }
   function fmtN(x) { return x == null || !isFinite(x) ? "–" : (x > 0 ? "+" : "") + (Math.abs(x) < 1 ? (x * 100).toFixed(1) + "%" : x.toFixed(2)); }
+  function fmtMs(x) { return x == null || !isFinite(x) ? "–" : (x > 0 ? "+" : "") + (x * 1000).toFixed(0) + " ms"; }
 
   // ---------- the evidence graph ----------
   // Nodes and edges built from the record. Every edge carries its evidence (the numbers), n, a confidence, a timestamp and a source.
@@ -259,6 +298,14 @@
           edge(sw, sp, "same day as", { evidence: { swing: c, shots: rows.length }, n: Math.min(c.n || 0, rows.length), confidence: conf(Math.min(c.n || 0, rows.length), 10), kind: "OBSERVED", source: "swing harness + ledger", timestamp: s.date, association: "co-occurrence only, not cause" });
           const out = node(`sg:${a.id}`, "STROKES_GAINED", `${a.date} ${a.sgTotal != null ? (a.sgTotal >= 0 ? "+" : "") + a.sgTotal.toFixed(1) : "–"} against the engine`, { round: a.id });
           edge(sp, out, "scored", { evidence: { sg: a.sgTotal, cats: a.cats }, n: a.nScored, confidence: conf(a.nComplete, 9), kind: "ESTIMATED", source: "ledger.js (curve-priced positions)", timestamp: a.date }); } } }
+    // 2b. swing sessions → the hole they were filmed on (the phone's position against Loop's map): co-location, with the strike checked
+    //     in the video; the shot's outcome stays unknown until a marked round of that moment links it
+    for (const s of ctx.sessions || []) { const w = s.where; if (!w || !w.hole) continue;
+      const hid = node(`ctx:${w.course}:${w.hole}`, "HOLE_CONTEXT", `${w.course_name || w.course} hole ${w.hole}${w.club_hint ? ` (the plan's club: ${w.club_hint.club})` : ""}`, { course: w.course, hole: w.hole });
+      const sws = s.swings.filter(x => !x.excluded); const struck = sws.filter(x => strikeOf(x).struck === true).length;
+      const sid = node(`ses:${s.id}`, "SWING_OBSERVATION", `${s.date || "undated"} ${s.golfer === "me" ? "your" : s.golfer === "unknown" ? "an unlabelled" : s.golfer + "'s"} ${sws.length} swing${sws.length === 1 ? "" : "s"} (${w.spot})`, { session: s.id });
+      edge(sid, hid, "filmed on", { evidence: { spot: w.spot, d_m: w.d_m == null ? null : w.d_m, struck, located: "OBSERVED position, INFERRED hole" }, n: sws.length, confidence: w.spot === "tee" ? "located (tee)" : "located", kind: "OBSERVED",
+        source: "the video's location tag against Loop's map (where.py); the strike from the video's own clocks", timestamp: s.date, association: "co-location only; the shot's outcome is unknown until a marked round links it" }); }
     // 3. practice change → swing change → shot change → scoring change (before/after the date the practice started)
     for (const pc of ctx.practice || []) {
       const p = node(`pc:${pc.id}`, "PRACTICE_CHANGE", `${pc.date}: ${pc.what}`, pc);
@@ -283,5 +330,5 @@
   function lookVsPlay(swingChanged, scoresChanged) { return swingChanged && !scoresChanged ? "looks different, does not (yet) play better" : swingChanged && scoresChanged ? "looks and plays different" : !swingChanged && scoresChanged ? "plays different, the swing measurement did not move" : "neither has moved"; }
 
   window.LoopSwing = { SCHEMA, METRICS, NEVER, RULES, HYPOTHESES, normalize, sessionStats, baseline, compareMetric, todayVsNormal, linkShots, swingTime, shotRows, dayModel, todayShots, todayParams,
-    clubGroup, permutationTest, bootstrapCI, evalH1, evalH2, evalGroups, graph, lookVsPlay, median, mad, mean, sd, fmtN };
+    clubGroup, permutationTest, bootstrapCI, evalH1, evalH2, evalH3, evalGroups, graph, lookVsPlay, median, mad, mean, sd, fmtN, fmtMs, strikeOf, spotKind, associations };
 })();
