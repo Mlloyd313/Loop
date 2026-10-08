@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="40802edafd">
+<meta name="loop-build" content="5f5cf4c60e">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -628,7 +628,7 @@ function rulesBlock(c, h, r){
     <div><span>If a desert ball costs two strokes (lost: stroke and distance), not one and a drop</span><span>${assume(R.pen2, "the engine's call above")}</span></div>
     <div><span>If your pattern is 40 % wider than the scratch model</span><span>${assume(R.wide, "the engine's call above")}</span></div>
   </div>
-  <div class="src">Between dead zones at each club's landing (yards, the widest line within 10° of the fairway's own): ${widths}${d[o.club].crossed ? `; a hazard crosses ${o.club}'s landing` : ""}. Dead zones are desert, water and scrub — what the engine charges a stroke and a drop for. DECADE's rule (GOLF.com, 2020: 65 yd between penalty hazards; Golf Digest, 2021: 70) is a heuristic for the expected-value answer; across the 124 priced par 4s and 5s it picks a shorter club than the engine on 49 and costs 0.10 a hole on average under this model (0.08 with desert at two strokes), never beating it, because it is priced by the same curve. Where the two disagree, the question is the model's inputs — how wide your pattern really is and what a desert ball really costs — not which rule to follow; the two lines above say which way each would move the call. All model strokes, not a score prediction (pipeline/bench_rules.py, session K).</div>`;
+  <div class="src">Between dead zones at each club's landing (yards, the widest line within 10° of the fairway's own): ${widths}${d[o.club].crossed ? `; a hazard crosses ${o.club}'s landing` : ""}. Dead zones are desert, water and scrub — what the engine charges a stroke and a drop for. DECADE's rule (GOLF.com, 2020: 65 yd between penalty hazards; Golf Digest, 2021: 70) is a heuristic for the expected-value answer; across the 124 priced par 4s and 5s it picks a shorter club than the engine on 53 and costs 0.10 a hole on average under this model (0.08 with desert at two strokes), never beating it, because it is priced by the same curve. Where the two disagree, the question is the model's inputs — how wide your pattern really is and what a desert ball really costs — not which rule to follow; the two lines above say which way each would move the call. All model strokes, not a score prediction (pipeline/bench_rules.py, session K).</div>`;
 }
 function renderHole(){
   const c = course(), h = hole(); const card = $("#holeCard");
