@@ -273,6 +273,46 @@
   }
 
   // ---------- per hole ----------
+  // ---------- the corridor rule (session K, 2026-10-08): DECADE's public tee rule, priced by this engine ----------
+  // "Dead zones" are penalty ground (desert, water, scrub). For each tee club, over the engine's own aim scan, the aim whose landing
+  // corridor is widest: the run of non-penalty cells through the landing point, laterally (perpendicular to the aim), the least of three
+  // depths (L − σ, L, L + σ with σ the pattern's distance spread); "crossed" when a depth within ±1.5 σ has more than 60 % penalty cells
+  // across that corridor. The rule's line is toward the corridor's centre on the 2° grid; its price is the engine's own curve at that aim
+  // (the same seeded simulation); the corridor is searched within ±10° of the fairway's own line (the landing area a golfer
+  // would look at, not another hole's). The rule: the longest club whose corridor is at least minWidth yards and is not crossed; failing all,
+  // the widest uncrossed corridor, else the widest. options = teeOptions(h, P, altf) (so nothing is re-simulated).
+  const PEN_LIES = new Set([L.DESERT, L.WATER, L.SCRUB]);
+  function corridorAt(H, aimDeg, Lm, sigmaM) {
+    const a = aimDeg * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a), rx = -uy, ry = ux;
+    const runAt = depthM => { const lies = []; for (let t = -160; t <= 160; t++) { lies.push(PEN_LIES.has(lieAt(H, ux * depthM + rx * t * YD, uy * depthM + ry * t * YD)) ? 0 : 1); }
+      const c = 160; if (!lies[c]) return [0, 0, lies]; let lo = c, hi = c; while (lo > 0 && lies[lo - 1]) lo--; while (hi < 320 && lies[hi + 1]) hi++; return [lo - c, hi - c, lies]; };
+    const [lo, hi] = runAt(Lm); const w0 = hi - lo; const ws = [w0];
+    for (const d of [Lm - sigmaM, Lm + sigmaM]) { const r = runAt(d); ws.push(r[1] - r[0]); }
+    let crossed = false; if (w0 > 0) for (let d = Lm - 1.5 * sigmaM; d <= Lm + 1.5 * sigmaM; d += 2 * YD) { const lies = runAt(d)[2]; let pen = 0, tot = 0; for (let t = lo; t <= hi; t++) { tot++; if (!lies[t + 160]) pen++; } if (tot > 0 && pen / tot > 0.6) { crossed = true; break; } }
+    return { width: Math.min(...ws), widthAtL: w0, lo, hi, centre: (lo + hi) / 2, crossed };
+  }
+  function landingYd(H, P, club, aimDeg) {   // carry + roll along this aim, the engine's elevation rule applied twice
+    const a = aimDeg * Math.PI / 180; let dist = club.carry; const k = 1 / Math.tan((club.name === "Driver" ? P.angles.driver : (club.name === "3-wood" || club.name === "Hybrid") ? P.angles.wood : P.angles.long) * Math.PI / 180);
+    const z0 = zAt(H, 0, 0); for (let i = 0; i < 2; i++) { const zl = zAt(H, Math.cos(a) * dist * YD, Math.sin(a) * dist * YD); dist = club.carry + k * (z0 - zl) / 3; }
+    return dist + club.roll;
+  }
+  function corridorRule(h, P, altf, options, minWidth) {
+    minWidth = minWidth || 65; const H = decodeHole(h); applyPin(H, P); const aim0 = options[0].aim0; const clubs = {};
+    const snap = aim => Math.max(aim0 + P.aim_min, Math.min(aim0 + P.aim_max, Math.round(aim / P.aim_step) * P.aim_step));
+    for (const o of options) { const club = clubParams(o.club, P, altf); let best = null;
+      for (let aim = aim0 - 10; aim <= aim0 + 10; aim += P.aim_step) {   // ±10° of the fairway's own line: the landing area a golfer would look at
+        const Lyd = landingYd(H, P, club, aim); const cor = corridorAt(H, aim, Lyd * YD, P.dist_pct * club.carry * YD);
+        const cand = { aim, landing: Math.round(Lyd), width: cor.width, widthAtL: cor.widthAtL, centre: cor.centre, crossed: cor.crossed };
+        if (!best || cand.width > best.width || (cand.width === best.width && Math.abs(aim - aim0) < Math.abs(best.aim - aim0))) best = cand; }
+      const aimRule = snap(best.aim + Math.atan2(best.centre * YD, best.landing * YD) * 180 / Math.PI); const cv = o.curve.find(x => x.aim === aimRule);
+      clubs[o.club] = { landing: best.landing, width: best.width, widthAtL: best.widthAtL, centre: Math.round(best.centre), corridorAim: best.aim, crossed: best.crossed, aim: aimRule, E: cv ? cv.E : null, bestAim: o.best.aim, bestE: o.best.E }; }
+    const order = D.tee_clubs.filter(n => clubs[n]); let pick = null, why = "the longest club with " + minWidth + " yd between dead zones and no hazard across its landing";
+    for (const n of order) { const q = clubs[n]; if (q.width >= minWidth && !q.crossed) { pick = n; break; } }
+    if (!pick) { const open = order.filter(n => !clubs[n].crossed); const pool = open.length ? open : order; pick = pool.slice().sort((x, y) => clubs[y].width - clubs[x].width)[0]; why = "no club has " + minWidth + " yd between dead zones: the widest corridor"; }
+    const q = clubs[pick]; const E0 = options[0].best.E;
+    return { minWidth, clubs, pick: { club: pick, aim: q.aim, E: q.E, width: q.width, landing: q.landing, why, dE: q.E == null ? null : q.E - E0 }, line: { club: "Driver", aim: aim0, E: (options.find(o => o.club === "Driver") || { curve: [] }).curve.find(x => x.aim === aim0)?.E ?? null } };
+  }
+
   function runHole(course, h, P, opts) {
     const altf = 1 + P.alt_rule / 100 * (course.alt_ft - P.home_ft) / 1000;
     if (h.nodata) return { kind: "nodata", E: null };
@@ -291,5 +331,5 @@
   }
 
   for (const c of D.courses) for (const h of c.holes) h._key = c.key + ":" + h.hole;
-  window.LoopEngine = { setOverrides, overrideFor, pointInPoly, decodeHole, applyPin, lieAt, zAt, clubParams, clubForDistance, teeOptions, approach, goVsLay, runHole, priceAt, L, YD, LIEFX, lut, baseAt, windComponents };
+  window.LoopEngine = { setOverrides, overrideFor, pointInPoly, decodeHole, applyPin, lieAt, zAt, clubParams, clubForDistance, teeOptions, approach, goVsLay, runHole, priceAt, corridorRule, L, YD, LIEFX, lut, baseAt, windComponents };
 })();

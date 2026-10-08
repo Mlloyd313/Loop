@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="6c714b4cbb">
+<meta name="loop-build" content="40802edafd">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -92,6 +92,7 @@ main{padding:14px 16px 60px;max-width:1500px;margin:0 auto}
 .rows{margin:6px 0 0;font-size:14.5px}
 .rows div{padding:5px 0;border-top:1px solid var(--rule);display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}
 .rows div:first-child{border-top:0}
+.rows.rules div span:first-child{max-width:62ch;color:var(--ink2)}
 .rows b{font-family:var(--num);font-weight:600;font-size:16px}
 .go{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
 .go>div{padding:10px 12px;border:1px solid var(--rule);border-radius:8px}
@@ -606,6 +607,29 @@ function profileSvg(h, r){
     <text x="${W-pad}" y="14" font-size="11" fill="var(--mute)" text-anchor="end" font-family="var(--num)">low ${Math.round(zmin)} · high ${Math.round(zmax)}</text></svg>`;
 }
 function interpProfile(h, sx){ const pr = profileFor(h); const s=pr.s, z=pr.ft; for (let i=1;i<s.length;i++) if (s[i]>=sx){ const t=(sx-s[i-1])/((s[i]-s[i-1])||1); return z[i-1]+t*(z[i]-z[i-1]); } return z[z.length-1]; }
+// ---------------- other rules for the same tee shot (session K, 2026-10-08): the engine's call against the plan, DECADE's corridor rule and two assumptions ----------------
+function ensureRules(c, h, r){
+  if (r.kind !== "tee" || r.rules) return r.rules;
+  const af = altf(c); const cr = E.corridorRule(h, state.P, af, r.options, 65); const pick = r.options[0];
+  const under = (over) => { const P2 = Object.assign({}, state.P, over); const o2 = E.teeOptions(h, P2, af, { n: 800, keep: 0 }); const same = o2.find(o => o.club === pick.club); const cv = same ? same.curve.find(x => x.aim === pick.best.aim) : null;
+    return { club: o2[0].club, aim: o2[0].best.aim, E: o2[0].best.E, window: o2[0].window, shippedE: cv ? cv.E : null, regret: cv ? cv.E - o2[0].best.E : null, same: o2[0].club === pick.club && Math.abs(o2[0].best.aim - pick.best.aim) <= 2 }; };
+  r.rules = { cr, pen2: under({ penalty: 2 }), wide: under({ disp: 1.4 }) }; return r.rules;
+}
+function rulesBlock(c, h, r){
+  const R = ensureRules(c, h, r); if (!R) return ""; const o = r.options[0], b = o.best; const cr = R.cr, q = cr.pick, d = cr.clubs; const plan = planClubFor(c, h);
+  const cost = (E) => E == null ? "–" : E - r.E < 0.005 ? `<span style="color:var(--mute)">agrees</span>` : `costs <b style="color:var(--engine)">${sgn(E - r.E)}</b>`;
+  const widths = r.options.map(x => `${x.club} ${d[x.club].width}`).join(" · ");
+  const assume = (a, what) => a.same ? `the call stays <b>${o.club} ${aimShort(b.aim)}</b>` : `the call becomes <b>${a.club} ${aimShort(a.aim)}</b>${a.regret != null ? ` — ${what} would then cost <b>${sgn(a.regret)}</b> a hole` : ""}`;
+  return `<h2>The same tee shot by other rules</h2><div class="rows rules" id="rulesBlock">
+    <div><span>The engine: expected strokes for your pattern on this ground</span><span><b>${o.club} ${aimShort(b.aim)}</b> · <b>${fmt(r.E)}</b></span></div>
+    ${plan && r.planE != null ? `<div><span>The written plan</span><span>${plan}${plan !== o.club ? " " + aimShort(r.planAim) : ""} · <b>${fmt(r.planE)}</b> · ${cost(r.planE)}</span></div>` : ""}
+    <div><span>DECADE's corridor rule — the longest club with 65 yd between dead zones at its landing, aimed at the corridor's centre</span><span><b>${q.club} ${aimShort(q.aim)}</b> · ${q.E != null ? `<b>${fmt(q.E)}</b> · ${cost(q.E)}` : "not on the scan"}</span></div>
+    <div><span>Driver down the fairway's own line (${aimShort(cr.line.aim)})</span><span>${cr.line.E != null ? `<b>${fmt(cr.line.E)}</b> · ${cost(cr.line.E)}` : "–"}</span></div>
+    <div><span>If a desert ball costs two strokes (lost: stroke and distance), not one and a drop</span><span>${assume(R.pen2, "the engine's call above")}</span></div>
+    <div><span>If your pattern is 40 % wider than the scratch model</span><span>${assume(R.wide, "the engine's call above")}</span></div>
+  </div>
+  <div class="src">Between dead zones at each club's landing (yards, the widest line within 10° of the fairway's own): ${widths}${d[o.club].crossed ? `; a hazard crosses ${o.club}'s landing` : ""}. Dead zones are desert, water and scrub — what the engine charges a stroke and a drop for. DECADE's rule (GOLF.com, 2020: 65 yd between penalty hazards; Golf Digest, 2021: 70) is a heuristic for the expected-value answer; across the 124 priced par 4s and 5s it picks a shorter club than the engine on 49 and costs 0.10 a hole on average under this model (0.08 with desert at two strokes), never beating it, because it is priced by the same curve. Where the two disagree, the question is the model's inputs — how wide your pattern really is and what a desert ball really costs — not which rule to follow; the two lines above say which way each would move the call. All model strokes, not a score prediction (pipeline/bench_rules.py, session K).</div>`;
+}
 function renderHole(){
   const c = course(), h = hole(); const card = $("#holeCard");
   if (h.nodata) { renderPlayRow(); card.innerHTML = `<h1>Hole ${h.hole}<span class="meta">Par ${h.par} · ${h.card} yards${h.si?` · SI ${h.si}`:""}</span></h1><p class="empty">This hole has no measured line yet (it sits outside the course's OpenStreetMap outline), so there is nothing to simulate. The plan's notes are below.</p>${roundBlock(c,h)}${planBlock(c,h,null)}`;
@@ -662,9 +686,10 @@ function renderHole(){
   html += `<h2>Elevation (USGS lidar)</h2>${profileSvg(h, r)}`;
   html += planBlock(c, h, r);
   if (r.kind === "tee") {
-    html += `<h2>Every tee option</h2><div class="tablewrap"><table><thead><tr><th>Club</th><th class="n">Total</th><th>Aim</th><th>Window</th><th class="n">Expected</th><th>Where it lands</th><th class="n">Leaves</th><th class="n">Plays</th></tr></thead><tbody>`;
-    for (const o of r.options) { const b=o.best; html += `<tr class="${o===r.options[0]?"pick":""}"><td>${o.club}${planClubFor(c,h)===o.club?` <span class="chip" style="background:var(--plan);color:#fff">plan</span>`:""}</td><td class="n">${Math.round(o.total)}</td><td>${aimShort(b.aim)}</td><td>${aimShort(o.window[0])}–${aimShort(o.window[1])}</td><td class="n"><b>${fmt(b.E)}</b></td><td><span class="mini">${ODDS.map(([k,cc])=>`<i style="width:${(b.odds[k]||0)*100}%;background:${cc}"></i>`).join("")}</span> <span style="font-size:12px;color:var(--mute)">fw ${pct(b.odds.fairway)} · trouble ${pct((b.odds.desert||0)+(b.odds.water||0)+(b.odds.sand||0))}</span></td><td class="n">${Math.round(b.rem)}</td><td class="n">${Math.round(b.plays)}</td></tr>`; }
+    html += `<h2>Every tee option</h2><div class="tablewrap"><table><thead><tr><th>Club</th><th class="n">Total</th><th>Aim</th><th>Window</th><th class="n">Expected</th><th>Where it lands</th><th class="n">Leaves</th><th class="n">Plays</th><th class="n" title="Yards between dead zones (desert, water, scrub) at this club's landing, on the widest line within 10° of the fairway's own">Dead zones</th></tr></thead><tbody>`; const RR = ensureRules(c, h, r);
+    for (const o of r.options) { const b=o.best; html += `<tr class="${o===r.options[0]?"pick":""}"><td>${o.club}${planClubFor(c,h)===o.club?` <span class="chip" style="background:var(--plan);color:#fff">plan</span>`:""}</td><td class="n">${Math.round(o.total)}</td><td>${aimShort(b.aim)}</td><td>${aimShort(o.window[0])}–${aimShort(o.window[1])}</td><td class="n"><b>${fmt(b.E)}</b></td><td><span class="mini">${ODDS.map(([k,cc])=>`<i style="width:${(b.odds[k]||0)*100}%;background:${cc}"></i>`).join("")}</span> <span style="font-size:12px;color:var(--mute)">fw ${pct(b.odds.fairway)} · trouble ${pct((b.odds.desert||0)+(b.odds.water||0)+(b.odds.sand||0))}</span></td><td class="n">${Math.round(b.rem)}</td><td class="n">${Math.round(b.plays)}</td><td class="n">${RR ? `${RR.cr.clubs[o.club].width} yd${RR.cr.clubs[o.club].crossed ? " ✕" : ""}` : "–"}</td></tr>`; }
     html += `</tbody></table></div>`;
+    html += rulesBlock(c, h, r);
   }
   html += `<div class="src">${ovr ? `<b>Green moved by you</b> (${ovr.poly != null ? "to a mapped green" : "to a tapped point, 12-yd disc"}; the elevation profile, the line and every number follow it; this correction lives in this browser — Settings → Corrections has it as text for the rebuild). ` : ""}Surfaces: fairway from ${h.src.fairway==="osm"?"OpenStreetMap":h.src.fairway==="imagery"?"the aerial imagery":h.par===3?"nowhere (a par 3: priced tee to green)":"nowhere (unpriced)"}, green from ${h.src.green==="osm"?"OpenStreetMap":h.src.green==="imagery"?(h.src.green_imagery?`${h.src.green_imagery} imagery`:"the aerial imagery")+(h.src.green_m2?` (${h.src.green_m2} m², grown from the pin)`:""):"a 12-yard disc at the line end"}${h.src.sand?`, sand from ${srcName(h.src.sand)}`:""}${h.src.water&&h.src.water!=="none"?`, water from ${srcName(h.src.water)}`:""}${h.src.rough_naip_m2?`, ${h.src.rough_naip_m2} m² of turf the Esri picture shows dormant read as rough from NAIP`:""}${h.src.imagery?`; the imagery read is ${h.src.imagery} (public domain) because Esri's shows this course dormant — the picture above is still Esri's`:h.src.hazards_imagery?`; bunkers and water read from ${h.src.hazards_imagery} (public domain; bunkers found 0.74–0.97 and 0.85–0.95 of the blobs real against OpenStreetMap's, held out by course)`:""}. Elevation: ${(c.lidar&&c.lidar.title)||"USGS 3DEP"}. Dispersion: ${state.P.clubsOverride?"your club table":"the model calibrated to Arccos scratch green-hit rates (not a 3-handicap model; on these greens it hits fewer: see Settings)"} at ${Math.round(state.P.disp*100)}%, ${Math.round(state.P.q_miss*100)}% mishits, ${state.P.baseline} baseline. Desert and water cost a stroke and a drop; the numbers compare options and are not a score prediction.</div>`;
   card.innerHTML = html;
