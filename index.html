@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="8a7d0580b1">
+<meta name="loop-build" content="c30a835772">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -901,7 +901,7 @@ function saveSwings(){ try { localStorage.setItem("loop.swings", JSON.stringify(
 function slimSession(s){ delete s.summary; for (const w of s.swings) { if (w.pose) { const p = {}; for (const e of SW_FIG_EVENTS) if (w.pose[e]) p[e] = w.pose[e]; w.pose = p; } } s.imported = s.imported || new Date().toISOString(); return s; }
 // where a session was filmed: the phone's position matched to Loop's holes by the harness (swinglab/where.py)
 function swWhere(s, long){ const w = s.where; if (!w || !w.course) return ""; const c = course_(w.course); const name = c ? c.name : (w.course_name || w.course);
-  if (!w.hole) return long ? `filmed at ${esc(name)}, on no mapped hole (${esc(w.spot || "the grounds")})` : esc(name);
+  if (!w.hole) return long ? `filmed near ${esc(name)}, on no mapped hole (a range, a practice area or nearby)` : `near ${esc(name)}`;
   if (!long) return `${esc(name)} ${w.hole}${w.spot === "on the hole" ? "" : " " + esc(w.spot)}`;
   return `filmed at ${esc(name)}, hole ${w.hole}${w.par ? ` (par ${w.par}${w.yards ? `, ${w.yards} yd` : ""})` : ""} — ${esc(w.spot)}${w.spot === "on the hole" && w.to_green_m != null ? `, about ${Math.round(w.to_green_m / 0.9144)} yd from the green` : ""}${w.also ? ` (or hole ${w.also.hole}, ${esc(w.also.spot)})` : ""}: the phone's position, the hole read from Loop's map`; }
 function localDate(iso){ const d = new Date(iso); if (isNaN(d)) return null; return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
@@ -1010,7 +1010,7 @@ function sessionDetail(s){
     const avail = Object.keys(w.metrics).filter(k => w.metrics[k].available && SW.METRICS[k]);
     html += `<div style="border-top:1px solid var(--rule);padding:8px 0"><div class="row" style="margin:0"><b>Swing ${w.index + 1}</b><span style="color:var(--ink2);font-size:13px">${esc(w.view || "")}${w.view_info && w.view_info.oblique ? " (oblique)" : ""} · ${esc(w.handedness || "?")}-handed · impact at ${fmt(w.t_impact, 2)} s${(w.event_flags || []).length ? ` · <span title="${esc(w.event_flags.join("; "))}">${w.event_flags.length} flag${w.event_flags.length === 1 ? "" : "s"}</span>` : ""}</span>
       ${r ? `<a href="#" data-gohole="${r.course}:${L.hole}" style="font-size:13px">linked: ${esc(course_(r.course).name)} hole ${L.hole}, shot ${L.shot + 1} (${L.dt} s after the mark)</a>` : L && L.day && L.day.length ? `<span style="font-size:12.5px;color:var(--mute)">same day as ${L.day.length} round${L.day.length === 1 ? "" : "s"} (not linked to one shot)</span>` : ""}
-      <label style="margin-left:auto;font-size:12.5px;color:var(--ink2)"><input type="checkbox" data-swex="${w.index}" ${w.excluded ? "checked" : ""}> leave out of my normal</label></div>
+      <label style="margin-left:auto;font-size:12.5px;color:var(--ink2)"><input type="checkbox" data-swex="${w.index}" ${w.excluded ? "checked" : ""}> leave out of my normal</label>${w.excluded && w.excluded_why ? `<div style="width:100%;font-size:12px;color:var(--mute)">${esc(w.excluded_why)}</div>` : ""}</div>
       ${w.pose ? `<div class="figs">${SW_FIG_EVENTS.map(e => swingFigure(w.pose, e)).join("")}</div>` : ""}
       <p class="help" style="margin:2px 0;font-size:12.5px;color:var(--ink2)">${avail.slice(0, 4).map(k => `${esc(swLabel(k))} <b>${swVal(k, w.metrics[k].value, w.metrics[k].unit)}</b>`).join(" · ") || "No measurement survived the checks for this swing."}</p>
       <details><summary style="cursor:pointer;font-size:12.5px;color:var(--mute)">every measurement and event time</summary><div class="tablewrap"><table><tbody>${Object.keys(w.metrics).filter(k => !SW.NEVER[k]).map(k => metricRow(k, w.metrics[k])).join("")}</tbody></table></div>
