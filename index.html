@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="ebcf41ba19">
+<meta name="loop-build" content="8a7d0580b1">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -699,7 +699,18 @@ function roundBlock(c, h){
     else if (live && rec && rec.shots.length && rec.score == null) html += `<div style="margin-top:8px"><button id="holedBtn2">Holed — enter the score</button></div>`;
   }
   html += historyBlock(c, h, r);
+  html += swingsHereBlock(c, h);
   return html;
+}
+// swing sessions the phone placed on this hole (OBSERVED position, INFERRED hole) — yours first
+function swingsHereBlock(c, h){
+  const ss = (state.swings || []).filter(s => s.where && s.where.course === c.key && s.where.hole === h.hole);
+  if (!ss.length) return "";
+  ss.sort((a, b) => (a.golfer === "me" ? 0 : 1) - (b.golfer === "me" ? 0 : 1) || (b.date || "").localeCompare(a.date || ""));
+  const line = s => { const st = SW.sessionStats(s, true); let t = null; for (const v in st) if (st[v].tempo_ratio) t = st[v].tempo_ratio.mean;
+    return `${esc(s.date || "undated")} · ${s.golfer === "me" ? "you" : s.golfer === "unknown" ? "whose?" : esc(s.golfer === "other" ? "someone else" : s.golfer)} · ${esc(s.where.spot)} · ${s.swings.length} swing${s.swings.length === 1 ? "" : "s"}${s.club ? ` · ${esc(s.club)}` : ""}${t != null ? ` · tempo ${swVal("tempo_ratio", t)}` : ""}`; };
+  const mine = ss.filter(s => s.golfer === "me").length;
+  return `<h2>Swings filmed here</h2><div class="plan" style="border-color:var(--ink2)"><div class="say">${ss.length} session${ss.length === 1 ? "" : "s"} filmed on this hole${mine ? `, ${mine} of them yours` : ""} (the phone's position; the hole is read from Loop's map).</div><p>${ss.slice(0, 6).map(line).join("<br>")}${ss.length > 6 ? `<br>and ${ss.length - 6} more in Swing` : ""}</p></div>`;
 }
 function historyBlock(c, h, cur){
   const rows = []; for (const r of state.rounds) { if (r.sample || (cur && r.id === cur.id) || r.course !== c.key) continue; const rec = (r.holes||{})[h.hole]; if (!rec || rec.score == null) continue; const a = ledgerHole(r, h); if (a.kind === "unpriced") continue; rows.push({ r, a }); }
@@ -888,6 +899,11 @@ function saveSwings(){ try { localStorage.setItem("loop.swings", JSON.stringify(
   catch (e) { toast("This browser's storage is full: export your swing sessions (Your data, below) and delete old ones."); return false; } }
 // what Loop keeps of a harness file: the measurements, the events, the four key poses (the rest of the file stays on the PC)
 function slimSession(s){ delete s.summary; for (const w of s.swings) { if (w.pose) { const p = {}; for (const e of SW_FIG_EVENTS) if (w.pose[e]) p[e] = w.pose[e]; w.pose = p; } } s.imported = s.imported || new Date().toISOString(); return s; }
+// where a session was filmed: the phone's position matched to Loop's holes by the harness (swinglab/where.py)
+function swWhere(s, long){ const w = s.where; if (!w || !w.course) return ""; const c = course_(w.course); const name = c ? c.name : (w.course_name || w.course);
+  if (!w.hole) return long ? `filmed at ${esc(name)}, on no mapped hole (${esc(w.spot || "the grounds")})` : esc(name);
+  if (!long) return `${esc(name)} ${w.hole}${w.spot === "on the hole" ? "" : " " + esc(w.spot)}`;
+  return `filmed at ${esc(name)}, hole ${w.hole}${w.par ? ` (par ${w.par}${w.yards ? `, ${w.yards} yd` : ""})` : ""} — ${esc(w.spot)}${w.spot === "on the hole" && w.to_green_m != null ? `, about ${Math.round(w.to_green_m / 0.9144)} yd from the green` : ""}${w.also ? ` (or hole ${w.also.hole}, ${esc(w.also.spot)})` : ""}: the phone's position, the hole read from Loop's map`; }
 function localDate(iso){ const d = new Date(iso); if (isNaN(d)) return null; return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 function importSwingJson(v, defaults){
   let list = Array.isArray(v) ? v : v && v.schema === "loop.swings/1" ? (v.sessions || []) : [v]; let added = 0, replaced = 0, bad = 0, pc = 0, lastId = null;
@@ -895,6 +911,7 @@ function importSwingJson(v, defaults){
   for (const raw of list) { let s; try { s = SW.normalize(raw); } catch (e) { bad++; continue; }
     if (raw.source && raw.source.created && !raw.date) s.date = localDate(raw.source.created) || s.date;   // the round's day is a local day
     if (defaults) { if (defaults.golfer && (!raw.golfer || raw.golfer === "unknown" || defaults.force)) s.golfer = defaults.golfer; if (defaults.club && !s.club) s.club = defaults.club; if (defaults.kind && !s.kind) s.kind = defaults.kind; if (defaults.date && !s.date) s.date = defaults.date; }
+    if (!s.kind && s.where && s.where.hole) s.kind = "course";   // filmed on a mapped hole (the phone's position)
     slimSession(s); lastId = s.id; const i = state.swings.findIndex(x => x.id === s.id);
     if (i >= 0) { for (const w of s.swings) { const o = state.swings[i].swings.find(x => x.index === w.index); if (o && o.excluded) w.excluded = true; } state.swings[i] = s; replaced++; } else { state.swings.push(s); added++; } }
   state.swings.sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.imported || "").localeCompare(a.imported || ""));
@@ -986,7 +1003,7 @@ function sessionDetail(s){
     <label>Where <select data-swset="kind"><option value="">—</option>${SW_KINDS.map(([v, l]) => `<option value="${v}" ${s.kind === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
     <label>Day <input type="date" data-swset="date" value="${esc(s.date || "")}"></label></div>`;
   const src = s.source || {}, an = s.analysis || {};
-  html += `<p class="help" style="font-size:12.5px;color:var(--mute)">${src.fps ? `${Math.round(src.fps)} fps${src.fps_used && src.fps_used !== src.fps ? ` (analysed at ${Math.round(src.fps_used)})` : ""}` : ""}${src.size ? ` · ${src.size[0]}×${src.size[1]}` : ""}${an.backend ? ` · pose: ${esc(an.backend)}` : ""} · ${s.swings.length} swing${s.swings.length === 1 ? "" : "s"} found${(s.rejected || []).length ? `, ${s.rejected.length} motion${s.rejected.length === 1 ? "" : "s"} rejected as not a swing` : ""}${src.created ? ` · filmed ${esc(/[+-]\d\d:?\d\d$/.test(src.created) && !/[+-]00:?00$/.test(src.created) ? src.created.slice(0, 16).replace("T", " ") + " (local time where it was filmed)" : new Date(src.created).toLocaleString())}` : " · the video carries no recording time"}${s.harness ? ` · harness ${esc(s.harness)}` : ""}.${(s.notes || []).length ? " " + esc(s.notes.join(" ")) : ""}</p>`;
+  html += `<p class="help" style="font-size:12.5px;color:var(--mute)">${src.fps ? `${Math.round(src.fps)} fps${src.fps_used && src.fps_used !== src.fps ? ` (analysed at ${Math.round(src.fps_used)})` : ""}` : ""}${src.size ? ` · ${src.size[0]}×${src.size[1]}` : ""}${an.backend ? ` · pose: ${esc(an.backend)}` : ""} · ${s.swings.length} swing${s.swings.length === 1 ? "" : "s"} found${(s.rejected || []).length ? `, ${s.rejected.length} motion${s.rejected.length === 1 ? "" : "s"} rejected as not a swing` : ""}${s.where && s.where.course ? ` · ${swWhere(s, true)}` : s.where && s.where.lat != null ? " · filmed away from Loop's courses" : ""}${!s.club && s.where && s.where.club_hint ? ` · club not set (a hint: ${esc(s.where.club_hint.club)}, ${esc(s.where.club_hint.why)})` : ""}${src.capture_fps && src.capture_fps >= 100 ? ` · a ${src.capture_fps}-fps original` : ""}${src.created ? ` · filmed ${esc(/[+-]\d\d:?\d\d$/.test(src.created) && !/[+-]00:?00$/.test(src.created) ? src.created.slice(0, 16).replace("T", " ") + " (local time where it was filmed)" : new Date(src.created).toLocaleString())}` : " · the video carries no recording time"}${s.harness ? ` · harness ${esc(s.harness)}` : ""}.${(s.notes || []).length ? " " + esc(s.notes.join(" ")) : ""}</p>`;
   html += compareBlock(s);
   html += `<h3 style="margin:16px 0 4px">Swing by swing</h3>`;
   for (const w of s.swings) { const L = links.find(x => x.swing === w.index); const r = L && L.round ? roundById(L.round) : null;
@@ -1008,7 +1025,7 @@ function renderSwing(){
   let html = `<h1>Swing</h1><p class="lede">The swing harness on the PC turns a phone video into the swing's timing and body positions, each labelled with how it was obtained. Loop compares you with you — this session against your own normal, never against a tour model — and checks every swing reading against where your ball went. Club path, face angle, attack and launch angles, club and ball speed are not measured: a phone camera cannot see them.</p>`;
   html += knowsBlock(analyses, h1, h2);
   // add a session
-  html += `<h2>Add a session</h2><div class="hyp"><p style="margin:0 0 6px;font-size:13.5px">Film face-on (from in front, chest to the camera) or down the line (from behind the hands), the whole body in frame, phone still, 120 or 240 fps if the phone offers it. On the PC: <code>python swing/swing_lab.py analyze VIDEO --golfer me --club 7-iron</code> writes <code>VIDEO.swing.json</code> next to the video. Add that file here.</p>
+  html += `<h2>Add a session</h2><div class="hyp"><p style="margin:0 0 6px;font-size:13.5px">Film face-on (from in front, chest to the camera) or down the line (from behind the hands), the whole body in frame, phone still, 120 or 240 fps if the phone offers it. On the PC: <code>python swing/swing_lab.py analyze VIDEO --golfer me --club 7-iron</code> writes <code>VIDEO.swing.json</code> next to the video; <code>batch FOLDER</code> does a whole folder (videos in <code>me</code> and <code>brother</code> subfolders are labelled, and the phone's position places each one on a course and hole). Add the files here.</p>
     <div class="row"><input type="file" id="swFile" accept=".json,application/json" multiple><label>Who <select id="swWho"><option value="">as the file says</option><option value="me">me</option><option value="other">someone else</option></select></label><label>Club <select id="swClub"><option value="">—</option>${D.clubs.map(c => `<option>${c.name}</option>`).join("")}</select></label><label>Where <select id="swKind"><option value="">—</option>${SW_KINDS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label></div>
     <details><summary style="cursor:pointer;font-size:12.5px;color:var(--mute)">or paste a session's text</summary><textarea id="swPaste" placeholder='{"schema": "loop.swing/1", ...}'></textarea><div style="margin-top:6px"><button id="swPasteGo">Add what is pasted</button></div></details></div>`;
   // the latest / open session
@@ -1016,7 +1033,7 @@ function renderSwing(){
   html += `<h2>Sessions (${mine.length})</h2>`;
   if (!mine.length) html += `<p class="empty" style="padding:20px">No swing sessions yet.</p>`;
   else html += `<div class="list">${mine.map(s => { const sv = sessionViews(s); const st = SW.sessionStats(s, true); let tempo = null; for (const v in st) if (st[v].tempo_ratio) tempo = st[v].tempo_ratio.mean;
-    return `<div class="r ${open && open.id === s.id ? "pick" : ""}"><span class="when">${esc(s.date || "undated")}</span><span>${esc(s.club || "club?")}${s.kind ? ` · ${esc((SW_KINDS.find(k => k[0] === s.kind) || [0, s.kind])[1])}` : ""} · ${Object.entries(sv).map(([v, n]) => `${n} ${esc(v)}`).join(", ")}${s.golfer !== "me" ? ` <span class="chip">${s.golfer === "unknown" ? "whose?" : "not you"}</span>` : ""}</span><span style="color:var(--ink2)">${tempo != null ? "tempo " + swVal("tempo_ratio", tempo) : ""}</span><span class="tools"><button data-swopen="${esc(s.id)}">${open && open.id === s.id ? "Close" : "Open"}</button><button data-swdel="${esc(s.id)}" class="quiet">${state.confirmSwDel === s.id ? "Really delete?" : "Delete"}</button></span></div>`; }).join("")}</div>`;
+    return `<div class="r ${open && open.id === s.id ? "pick" : ""}"><span class="when">${esc(s.date || "undated")}</span><span>${esc(s.club || "club?")}${s.kind ? ` · ${esc((SW_KINDS.find(k => k[0] === s.kind) || [0, s.kind])[1])}` : ""}${swWhere(s) ? ` · ${swWhere(s)}` : ""} · ${Object.entries(sv).map(([v, n]) => `${n} ${esc(v)}`).join(", ")}${s.golfer !== "me" ? ` <span class="chip">${s.golfer === "unknown" ? "whose?" : "not you"}</span>` : ""}</span><span style="color:var(--ink2)">${tempo != null ? "tempo " + swVal("tempo_ratio", tempo) : ""}</span><span class="tools"><button data-swopen="${esc(s.id)}">${open && open.id === s.id ? "Close" : "Open"}</button><button data-swdel="${esc(s.id)}" class="quiet">${state.confirmSwDel === s.id ? "Really delete?" : "Delete"}</button></span></div>`; }).join("")}</div>`;
   if (open) html += sessionDetail(open);
   // experiments
   html += `<h2>What Loop is testing</h2><p class="help" style="font-size:13px;color:var(--ink2)">Two questions written down before any data, each tested only when the data allow, each tied to what Loop would do differently. Until a test passes Loop does not act on it.</p>${hypCard(h1)}${hypCard(h2)}`;
