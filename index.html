@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="0510e8f455">
+<meta name="loop-build" content="6c714b4cbb">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -239,6 +239,7 @@ tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
     <label>Turf <select id="q_turf"><option value="firm">firm</option><option value="soft">soft</option></select></label>
     <label>Pin <select id="q_pin"><option>front</option><option>middle</option><option>back</option></select></label>
     <button id="q_apply">Apply</button>
+    <button id="q_forecast" class="noprint" title="Fill the wind and temperature from the current forecast for this course (Open-Meteo, no account; nothing about you is sent)">Use the forecast</button><span id="q_fsrc" style="font-size:12px;color:var(--mute)"></span>
   </div>
   <div class="holes" id="holeStrip" role="tablist" aria-label="Holes"></div>
 </header>
@@ -328,6 +329,7 @@ function renderHeader(){
   $("#holeStrip").innerHTML = c.holes.map(h => `<button role="tab" aria-current="${h.hole===state.hole}" data-hole="${h.hole}" title="Par ${h.par}, ${h.card} yards">${h.hole}<small>${h.par}·${h.card}</small></button>`).join("");
   const cur = $("#holeStrip button[aria-current='true']"); if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest", inline: "center" });
   $("#condChip").innerHTML = `<span>${windText()}</span><span>${state.P.temp_f}°F</span><span>${state.P.setting}</span><span>pin ${state.P.pin}</span>`;
+  $("#condChip").title = state.condNote ? "Today's conditions — " + state.condNote : "Today's conditions";
   $$("nav.views button").forEach(b => b.setAttribute("aria-current", b.dataset.view===state.view ? "page" : "false"));
 }
 // ---------------- map ----------------
@@ -664,7 +666,7 @@ function renderHole(){
     for (const o of r.options) { const b=o.best; html += `<tr class="${o===r.options[0]?"pick":""}"><td>${o.club}${planClubFor(c,h)===o.club?` <span class="chip" style="background:var(--plan);color:#fff">plan</span>`:""}</td><td class="n">${Math.round(o.total)}</td><td>${aimShort(b.aim)}</td><td>${aimShort(o.window[0])}–${aimShort(o.window[1])}</td><td class="n"><b>${fmt(b.E)}</b></td><td><span class="mini">${ODDS.map(([k,cc])=>`<i style="width:${(b.odds[k]||0)*100}%;background:${cc}"></i>`).join("")}</span> <span style="font-size:12px;color:var(--mute)">fw ${pct(b.odds.fairway)} · trouble ${pct((b.odds.desert||0)+(b.odds.water||0)+(b.odds.sand||0))}</span></td><td class="n">${Math.round(b.rem)}</td><td class="n">${Math.round(b.plays)}</td></tr>`; }
     html += `</tbody></table></div>`;
   }
-  html += `<div class="src">${ovr ? `<b>Green moved by you</b> (${ovr.poly != null ? "to a mapped green" : "to a tapped point, 12-yd disc"}; the elevation profile, the line and every number follow it; this correction lives in this browser — Settings → Corrections has it as text for the rebuild). ` : ""}Surfaces: fairway from ${h.src.fairway==="osm"?"OpenStreetMap":h.src.fairway==="imagery"?"the aerial imagery":h.par===3?"nowhere (a par 3: priced tee to green)":"nowhere (unpriced)"}, green from ${h.src.green==="osm"?"OpenStreetMap":h.src.green==="imagery"?(h.src.green_imagery?`${h.src.green_imagery} imagery`:"the aerial imagery")+(h.src.green_m2?` (${h.src.green_m2} m², grown from the pin)`:""):"a 12-yard disc at the line end"}${h.src.sand?`, sand from ${srcName(h.src.sand)}`:""}${h.src.water&&h.src.water!=="none"?`, water from ${srcName(h.src.water)}`:""}${h.src.rough_naip_m2?`, ${h.src.rough_naip_m2} m² of turf the Esri picture shows dormant read as rough from NAIP`:""}${h.src.imagery?`; the imagery read is ${h.src.imagery} (public domain) because Esri's shows this course dormant — the picture above is still Esri's`:h.src.hazards_imagery?`; bunkers and water read from ${h.src.hazards_imagery} (public domain; bunkers found 0.74–0.97 and 0.85–0.96 of the blobs real against OpenStreetMap's, held out by course)`:""}. Elevation: ${(c.lidar&&c.lidar.title)||"USGS 3DEP"}. Dispersion: ${state.P.clubsOverride?"your club table":"the model calibrated to Arccos scratch green-hit rates (not a 3-handicap model; on these greens it hits fewer: see Settings)"} at ${Math.round(state.P.disp*100)}%, ${Math.round(state.P.q_miss*100)}% mishits, ${state.P.baseline} baseline. Desert and water cost a stroke and a drop; the numbers compare options and are not a score prediction.</div>`;
+  html += `<div class="src">${ovr ? `<b>Green moved by you</b> (${ovr.poly != null ? "to a mapped green" : "to a tapped point, 12-yd disc"}; the elevation profile, the line and every number follow it; this correction lives in this browser — Settings → Corrections has it as text for the rebuild). ` : ""}Surfaces: fairway from ${h.src.fairway==="osm"?"OpenStreetMap":h.src.fairway==="imagery"?"the aerial imagery":h.par===3?"nowhere (a par 3: priced tee to green)":"nowhere (unpriced)"}, green from ${h.src.green==="osm"?"OpenStreetMap":h.src.green==="imagery"?(h.src.green_imagery?`${h.src.green_imagery} imagery`:"the aerial imagery")+(h.src.green_m2?` (${h.src.green_m2} m², grown from the pin)`:""):"a 12-yard disc at the line end"}${h.src.sand?`, sand from ${srcName(h.src.sand)}`:""}${h.src.water&&h.src.water!=="none"?`, water from ${srcName(h.src.water)}`:""}${h.src.rough_naip_m2?`, ${h.src.rough_naip_m2} m² of turf the Esri picture shows dormant read as rough from NAIP`:""}${h.src.imagery?`; the imagery read is ${h.src.imagery} (public domain) because Esri's shows this course dormant — the picture above is still Esri's`:h.src.hazards_imagery?`; bunkers and water read from ${h.src.hazards_imagery} (public domain; bunkers found 0.74–0.97 and 0.85–0.95 of the blobs real against OpenStreetMap's, held out by course)`:""}. Elevation: ${(c.lidar&&c.lidar.title)||"USGS 3DEP"}. Dispersion: ${state.P.clubsOverride?"your club table":"the model calibrated to Arccos scratch green-hit rates (not a 3-handicap model; on these greens it hits fewer: see Settings)"} at ${Math.round(state.P.disp*100)}%, ${Math.round(state.P.q_miss*100)}% mishits, ${state.P.baseline} baseline. Desert and water cost a stroke and a drop; the numbers compare options and are not a score prediction.</div>`;
   card.innerHTML = html;
   const ct2 = $("#clearTap2"); if (ct2) ct2.addEventListener("click", () => { state.tap = null; $("#clearTap").style.display = "none"; renderHole(); });
   const ho = $("#hintOk"); if (ho) ho.addEventListener("click", () => { store.set("hintSeen", true); ho.parentElement.remove(); });
@@ -1151,7 +1153,7 @@ function renderSettings(){
     <label>Temperature (°F) <input type="number" id="s_temp_f" min="30" max="120" step="1" value="${P.temp_f}"></label>
     <label>Turf <select id="s_setting"><option value="firm" ${P.setting==="firm"?"selected":""}>firm</option><option value="soft" ${P.setting==="soft"?"selected":""}>soft (overseed)</option></select></label>
     <label>Pin position <select id="s_pin"><option ${P.pin==="front"?"selected":""}>front</option><option ${P.pin==="middle"?"selected":""}>middle</option><option ${P.pin==="back"?"selected":""}>back</option></select></label>
-    <p class="help">Wind is a caddie's rule of thumb: ${P.head_pct_per_mph}% of carry per mph into, ${P.tail_pct_per_mph}% per mph with, ${P.cross_yd_per_mph} yd of drift per mph across for a 300-yard shot. Every hole uses its own bearing.</p>
+    <p class="help">Wind is a caddie's rule of thumb: ${P.head_pct_per_mph}% of carry per mph into, ${P.tail_pct_per_mph}% per mph with, ${P.cross_yd_per_mph} yd of drift per mph across for a 300-yard shot. Every hole uses its own bearing. The conditions chip at the top can fill the wind and temperature from the current forecast at the course (Open-Meteo's 10-m wind; not in the artifact copy, whose frame refuses the network) — a forecast, not a measurement: the chip's tooltip says when it was taken.</p>
   </section>
   <section><h3>You</h3>
     <label>Dispersion scale <input type="range" id="s_disp" min="0.6" max="1.6" step="0.05" value="${P.disp}"> <span class="num" id="s_disp_v">${Math.round(P.disp*100)}%</span></label>
@@ -1210,13 +1212,31 @@ function setView(v){ state.view = v; for (const id of ["hole","round","rounds","
   if (v==="hole") renderHole(); if (v==="round") renderRound(); if (v==="rounds") renderRounds(); if (v==="swing") renderSwing(); if (v==="audit") renderAudit(); if (v==="settings") renderSettings(); if (v==="round"||v==="audit") startBackground(); window.scrollTo(0,0); }
 function startBackground(){ const c = course(); computeCourse(c, (done, total, complete) => { if (state.view==="round") renderRound(); if (state.view==="audit") renderAudit(); }); }
 $("#condChip").addEventListener("click", () => { const q = $("#quick"); const open = q.hidden; q.hidden = !open; $("#condChip").setAttribute("aria-expanded", String(open)); if (open) { $("#q_wind").value = state.P.wind_mph; $("#q_from").value = state.P.wind_from; $("#q_temp").value = state.P.temp_f; $("#q_turf").value = state.P.setting; $("#q_pin").value = state.P.pin; } });
-$("#q_apply").addEventListener("click", () => { state.P.wind_mph = +$("#q_wind").value || 0; state.P.wind_from = +$("#q_from").value || 0; state.P.temp_f = +$("#q_temp").value || 75; state.P.setting = $("#q_turf").value; state.P.pin = $("#q_pin").value; $("#quick").hidden = true; $("#condChip").setAttribute("aria-expanded","false"); saveP(); toast("Conditions applied: " + windText() + ", " + state.P.temp_f + "°F, " + state.P.setting + ", pin " + state.P.pin); });
+// Today's wind and temperature from a forecast, for the course on screen: Open-Meteo's current conditions at the course's own point
+// (10-m wind, the height the rule of thumb is written for). The artifact frame refuses fetch, so the button hides there. It fills
+// the fields; Apply commits them, and the chip's title says they came from a forecast and when. Nothing about the user is sent.
+async function useForecast(){
+  const c = course(); const b = $("#q_forecast"); const src = $("#q_fsrc"); b.disabled = true; b.textContent = "Fetching…"; src.textContent = "";
+  try {
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${c.origin[0].toFixed(4)}&longitude=${c.origin[1].toFixed(4)}&current=temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph&temperature_unit=fahrenheit&timezone=auto`;
+    const res = await fetch(u, { cache: "no-store" }); if (!res.ok) throw new Error("HTTP " + res.status);
+    const j = await res.json(); const cur = j.current || {};
+    if (cur.wind_speed_10m == null || cur.wind_direction_10m == null || cur.temperature_2m == null) throw new Error("no current conditions in the reply");
+    $("#q_wind").value = Math.round(cur.wind_speed_10m); $("#q_from").value = Math.round(cur.wind_direction_10m / 5) * 5; $("#q_temp").value = Math.round(cur.temperature_2m);
+    const when = String(cur.time || "").replace("T", " "); state.forecastNote = `forecast for ${c.name} at ${when} (Open-Meteo, 10-m wind${cur.wind_gusts_10m != null ? `, gusts ${Math.round(cur.wind_gusts_10m)} mph` : ""})`;
+    src.textContent = `${Math.round(cur.wind_speed_10m)} mph from ${Math.round(cur.wind_direction_10m)}°${cur.wind_gusts_10m != null ? `, gusts ${Math.round(cur.wind_gusts_10m)}` : ""}, ${Math.round(cur.temperature_2m)}°F at ${when} — press Apply`;
+  } catch (e) { src.textContent = "Could not reach the forecast (" + e.message + "); set the wind by hand."; }
+  b.disabled = false; b.textContent = "Use the forecast";
+}
+$("#q_forecast").addEventListener("click", useForecast);
+$("#q_apply").addEventListener("click", () => { state.P.wind_mph = +$("#q_wind").value || 0; state.P.wind_from = +$("#q_from").value || 0; state.P.temp_f = +$("#q_temp").value || 75; state.P.setting = $("#q_turf").value; state.P.pin = $("#q_pin").value; state.condNote = state.forecastNote || null; state.forecastNote = null; $("#q_fsrc").textContent = ""; $("#quick").hidden = true; $("#condChip").setAttribute("aria-expanded","false"); saveP(); toast("Conditions applied: " + windText() + ", " + state.P.temp_f + "°F, " + state.P.setting + ", pin " + state.P.pin + (state.condNote ? " — from the " + state.condNote : "")); });
 $("#courseSel").addEventListener("change", ev => { state.course = ev.target.value; store.set("course", state.course); state.hole = 1; store.set("hole", 1); state.tap = null; renderHeader(); setView(state.view); startBackground(); });
 $("#holeStrip").addEventListener("click", ev => { const b = ev.target.closest("button[data-hole]"); if (!b) return; state.hole = +b.dataset.hole; store.set("hole", state.hole); state.tap = null; state.holedOpen = false; setFixMode(false); state.markMode = false; $("#clearTap").style.display="none"; renderHeader(); if (state.view!=="hole") setView("hole"); else renderHole(); });
 $$("nav.views button").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
 document.addEventListener("keydown", ev => { if (ev.target.matches("input,select,textarea")) return; if (ev.key==="ArrowRight"||ev.key==="ArrowLeft") { const c=course(); const i = c.holes.findIndex(h=>h.hole===state.hole); const j = Math.max(0, Math.min(c.holes.length-1, i + (ev.key==="ArrowRight"?1:-1))); state.hole = c.holes[j].hole; store.set("hole", state.hole); state.tap=null; renderHeader(); if (state.view==="hole") renderHole(); } });
 // boot
 if (IN_ARTIFACT || !navigator.geolocation) { $("#gpsBtn").style.display = "none"; }
+if (IN_ARTIFACT || typeof fetch !== "function") { $("#q_forecast").style.display = "none"; }   // the artifact frame refuses fetch
 renderHeader(); setView("hole"); startBackground();
 })();
 </script>
