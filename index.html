@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="4e4e668a9c">
+<meta name="loop-build" content="0510e8f455">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -664,7 +664,7 @@ function renderHole(){
     for (const o of r.options) { const b=o.best; html += `<tr class="${o===r.options[0]?"pick":""}"><td>${o.club}${planClubFor(c,h)===o.club?` <span class="chip" style="background:var(--plan);color:#fff">plan</span>`:""}</td><td class="n">${Math.round(o.total)}</td><td>${aimShort(b.aim)}</td><td>${aimShort(o.window[0])}–${aimShort(o.window[1])}</td><td class="n"><b>${fmt(b.E)}</b></td><td><span class="mini">${ODDS.map(([k,cc])=>`<i style="width:${(b.odds[k]||0)*100}%;background:${cc}"></i>`).join("")}</span> <span style="font-size:12px;color:var(--mute)">fw ${pct(b.odds.fairway)} · trouble ${pct((b.odds.desert||0)+(b.odds.water||0)+(b.odds.sand||0))}</span></td><td class="n">${Math.round(b.rem)}</td><td class="n">${Math.round(b.plays)}</td></tr>`; }
     html += `</tbody></table></div>`;
   }
-  html += `<div class="src">${ovr ? `<b>Green moved by you</b> (${ovr.poly != null ? "to a mapped green" : "to a tapped point, 12-yd disc"}; the elevation profile, the line and every number follow it; this correction lives in this browser — Settings → Corrections has it as text for the rebuild). ` : ""}Surfaces: fairway from ${h.src.fairway==="osm"?"OpenStreetMap":h.src.fairway==="imagery"?"the aerial imagery":h.par===3?"nowhere (a par 3: priced tee to green)":"nowhere (unpriced)"}, green from ${h.src.green==="osm"?"OpenStreetMap":h.src.green==="imagery"?(h.src.green_imagery?`${h.src.green_imagery} imagery`:"the aerial imagery")+(h.src.green_m2?` (${h.src.green_m2} m², grown from the pin)`:""):"a 12-yard disc at the line end"}${h.src.sand?`, sand from ${h.src.sand.replace("+"," and ")}`:""}${h.src.imagery?`; the imagery read is ${h.src.imagery} (public domain) because Esri's shows this course dormant — the picture above is still Esri's`:""}. Elevation: ${(c.lidar&&c.lidar.title)||"USGS 3DEP"}. Dispersion: ${state.P.clubsOverride?"your club table":"the model calibrated to Arccos scratch green-hit rates (not a 3-handicap model; on these greens it hits fewer: see Settings)"} at ${Math.round(state.P.disp*100)}%, ${Math.round(state.P.q_miss*100)}% mishits, ${state.P.baseline} baseline. Desert and water cost a stroke and a drop; the numbers compare options and are not a score prediction.</div>`;
+  html += `<div class="src">${ovr ? `<b>Green moved by you</b> (${ovr.poly != null ? "to a mapped green" : "to a tapped point, 12-yd disc"}; the elevation profile, the line and every number follow it; this correction lives in this browser — Settings → Corrections has it as text for the rebuild). ` : ""}Surfaces: fairway from ${h.src.fairway==="osm"?"OpenStreetMap":h.src.fairway==="imagery"?"the aerial imagery":h.par===3?"nowhere (a par 3: priced tee to green)":"nowhere (unpriced)"}, green from ${h.src.green==="osm"?"OpenStreetMap":h.src.green==="imagery"?(h.src.green_imagery?`${h.src.green_imagery} imagery`:"the aerial imagery")+(h.src.green_m2?` (${h.src.green_m2} m², grown from the pin)`:""):"a 12-yard disc at the line end"}${h.src.sand?`, sand from ${srcName(h.src.sand)}`:""}${h.src.water&&h.src.water!=="none"?`, water from ${srcName(h.src.water)}`:""}${h.src.rough_naip_m2?`, ${h.src.rough_naip_m2} m² of turf the Esri picture shows dormant read as rough from NAIP`:""}${h.src.imagery?`; the imagery read is ${h.src.imagery} (public domain) because Esri's shows this course dormant — the picture above is still Esri's`:h.src.hazards_imagery?`; bunkers and water read from ${h.src.hazards_imagery} (public domain; bunkers found 0.74–0.97 and 0.85–0.96 of the blobs real against OpenStreetMap's, held out by course)`:""}. Elevation: ${(c.lidar&&c.lidar.title)||"USGS 3DEP"}. Dispersion: ${state.P.clubsOverride?"your club table":"the model calibrated to Arccos scratch green-hit rates (not a 3-handicap model; on these greens it hits fewer: see Settings)"} at ${Math.round(state.P.disp*100)}%, ${Math.round(state.P.q_miss*100)}% mishits, ${state.P.baseline} baseline. Desert and water cost a stroke and a drop; the numbers compare options and are not a score prediction.</div>`;
   card.innerHTML = html;
   const ct2 = $("#clearTap2"); if (ct2) ct2.addEventListener("click", () => { state.tap = null; $("#clearTap").style.display = "none"; renderHole(); });
   const ho = $("#hintOk"); if (ho) ho.addEventListener("click", () => { store.set("hintSeen", true); ho.parentElement.remove(); });
@@ -732,6 +732,7 @@ function bindRoundBlock(c, h){
   const sv = $("#saveScore"); if (sv) sv.addEventListener("click", () => { const sc = parseInt($("#scoreIn").value, 10); if (!(sc > 0)) { toast("Enter the hole's score."); return; } const pt = parseInt($("#puttsIn").value, 10); saveScore(h, sc, pt > 0 ? pt : null); });
   const cs = $("#cancelScore"); if (cs) cs.addEventListener("click", () => { state.holedOpen = false; renderHole(); });
 }
+function srcName(v){ return String(v).split("+").map(p=>({osm:"OpenStreetMap",naip:"USDA NAIP imagery",imagery:"the aerial imagery"})[p]||p).join(" and "); }
 function lieName(l){ return ({0:"from the desert",1:"from the fairway",2:"from the rough",3:"from the green",4:"from the sand",5:"from the water",6:"from another green",7:"from the waste area",8:"from the scrub",9:"from the tee"})[l] || ""; }
 function dataQuality(c){
   const hs = c.holes.filter(h=>!h.nodata); const fwOsm = hs.filter(h=>h.src.fairway==="osm").length, fwImg = hs.filter(h=>h.src.fairway==="imagery").length, fwNone = hs.filter(h=>h.src.fairway==="none").length;
@@ -739,9 +740,11 @@ function dataQuality(c){
   const inv = c.inventory || {}; const parts = [];
   parts.push(`fairways: ${fwOsm} holes from OpenStreetMap${fwImg?`, ${fwImg} read from imagery`:""}${fwNone?`, ${fwNone} unpriced`:""}`);
   parts.push(`greens: ${grOsm} mapped${grImg?`, ${grImg} from imagery`:""}${grDisc?`, ${grDisc} as a 12-yd disc`:""}`);
-  parts.push(`bunkers: ${inv.bunkers||0} mapped${(inv.bunkers||0)<12?" (the rest read from imagery where they sit in turf)":""}`);
-  parts.push(`water: ${inv.water||0} mapped`);
-  let verdict = fwOsm >= 12 && grOsm >= 12 && (inv.bunkers||0) >= 20 ? "well mapped — trust the hazard odds" : fwNone >= 4 ? "thin map — several holes cannot be priced" : "mixed sources — trust the lines and the elevation, read the hazard odds with the map open";
+  const naipSand = hs.filter(h=>h.src.sand&&h.src.sand.indexOf("naip")>=0).length, imgSand = hs.filter(h=>h.src.sand&&h.src.sand.indexOf("imagery")>=0).length;
+  const naipWater = hs.filter(h=>h.src.water&&h.src.water.indexOf("naip")>=0).length;
+  parts.push(`bunkers: ${inv.bunkers||0} mapped${naipSand?` + the ones read from USDA NAIP imagery on ${naipSand} holes`:imgSand?" (the rest read from imagery where they sit in turf)":""}`);
+  parts.push(`water: ${inv.water||0} mapped${naipWater?` + lakes read from USDA NAIP imagery on ${naipWater} holes`:""}`);
+  let verdict = fwOsm >= 12 && grOsm >= 12 && (inv.bunkers||0) >= 20 ? "well mapped — trust the hazard odds" : fwNone >= 4 ? "thin map — several holes cannot be priced" : (naipSand >= 12 || grImg >= 12) ? "read from in-season imagery — the hazard odds rest on USDA NAIP's bunkers (0.74–0.97 of OpenStreetMap's found where both exist, held out by course) and greens (IoU 0.8); check a surprising number against the map" : "mixed sources — trust the lines and the elevation, read the hazard odds with the map open";
   return { text: parts.join(" · "), verdict };
 }
 function compass(b){ const d=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"]; return d[Math.round(b/22.5)%16]+" ("+Math.round(b)+"°)"; }
