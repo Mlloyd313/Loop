@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="6ff5bf07de">
+<meta name="loop-build" content="9942ed40d3">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -570,7 +570,7 @@ function locateMe(){
 }
 $("#gpsBtn").addEventListener("click", locateMe);
 // ---- Follow me (session N): the phone build and the local file keep the position; the caddie line is always the shot from where you stand ----
-// Each fix: ignored beyond 30 m accuracy; off this hole → the hole you are on (within 150 m of its frame); on the tee → the tee call; else the
+// Each fix: ignored beyond 30 m accuracy; off this hole → the hole you are on (the nearest hole line, holeAt: 25 m to stay, 15 m to switch); on the tee → the tee call; else the
 // shot from here, re-priced once you have moved 8 m (or the hole changed). Paused while the page is hidden; the setting is kept per browser.
 const follow = { watch: null, last: null, lastHole: null, acc: null, note: null, manualUntil: 0 };   // manualUntil: a hole you chose by hand is kept for 90 s before Follow switches back
 function followNote(t){ follow.note = t; const cb = $("#callbar"); if (cb && t && !cb.hidden && !cb.classList.contains("quiet")) { let el = cb.querySelector(".fw"); if (!el) { el = document.createElement("span"); el.className = "muted fw"; const l2 = cb.querySelector(".l2"); if (l2) l2.appendChild(el); } el.textContent = t; } }
