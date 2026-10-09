@@ -100,12 +100,13 @@
       // decision layer: the engine's best option against the one you took, both priced the same way; execution is the rest
       o.sg_dec = null;
       if (cat === "tee") {
-        const club = o.clubUsed;
-        if (club && club !== "partial wedge") {
+        // Only a club you set is a decision: inferred from the distance, a mishit driver reads as a hybrid, and the charge would be for the swing (session N).
+        const club = o.club && o.club !== "partial wedge" ? o.club : null;
+        if (club) {
           let po = o._tee.options.find(x => x.club === club);
           if (!po) { const extra = E.teeOptions(h, P, altf, { n: 800, keep: 0, clubs: [club] }); po = extra[0]; }
           o._po = po; o.E_intent = po.best.E; o.sg_dec = r.E - o.E_intent; o.engineClub = r.pick.club; o.engineE = r.E; o.alt = club === r.pick.club ? null : { what: r.pick.club + " (the engine's pick)", E: r.E };
-        } else { o.E_intent = r.E; o.flags.push("club unknown — the decision is not separated from the swing"); }
+        } else { o.E_intent = r.E; o.engineClub = r.pick.club; o.engineE = r.E; o.flags.push(o.clubInferred ? "tee club inferred from the distance — the decision is not separated from the swing; set the club to price it" : "club unknown — the decision is not separated from the swing"); }
       } else if (o.E_lay != null) {
         let intent = o.intentSet;
         if (!intent) {
@@ -312,6 +313,7 @@
       // tee shot: the engine's pick, except every third hole where a plan club exists and differs (a decision to price)
       if (h.par !== 3) { const r = E.runHole(c, h, P, { n: 800 }); let club = r.pick.club; if (h.plan && h.plan.club && h.plan.club !== club && h.hole % 3 === 0) club = h.plan.club; let o = r.options.find(x => x.club === club) || E.teeOptions(h, P, altf, { n: 800, keep: 120, clubs: [club] })[0];
         if (X) o = E.teeOptions(h, X, altf, { n: 800, keep: 120, clubs: [club], aims: [o.best.aim] })[0];   // aimed with the player's normal pattern, played with the day's
+        shots[0].club = club;   // the simulation knows what it hit: the club is set, as a real round's tee-off sets it (session N)
         const s = pick(o.best.sample); pos = [s[0], s[1]]; }
       else { let ap = E.approach(h, [0, 0], P, altf, { n: 600, keep: 120 }); if (!ap.best) continue; if (X) ap = execAs(h, [0, 0], ap, altf); const s = pick(ap.best.sample); pos = [s[0], s[1]]; }
       while (!holed && guard++ < 10) {
