@@ -5,8 +5,11 @@
   const L = { DESERT: 0, FAIRWAY: 1, ROUGH: 2, GREEN: 3, SAND: 4, WATER: 5, OGREEN: 6, WASTE: 7, SCRUB: 8, TEE: 9 };
   const D = window.LOOP_DATA;
   if (D.defaults.pin_lat == null) D.defaults.pin_lat = 0;   // the tucked pin (session L): data.js built before it carries the default from its next rebuild
+  if (D.defaults.desert_play == null) Object.assign(D.defaults, { desert_play: 0.6, desert_unplayable: 0.25, desert_lost: 0.15, desert_drop_extra: 0.4 });   // the desert by the Rules (session L, D-L11)
   // from-lie effects on the next shot: dispersion multiplier, carry factor, penalty strokes before the shot
-  const LIEFX = { 0: { disp: 1.3, carry: 0.96, pen: 1 }, 1: { disp: 1, carry: 1, pen: 0 }, 2: { disp: 1.3, carry: 0.96, pen: 0 }, 3: { disp: 1, carry: 1, pen: 0 }, 4: { disp: 1.6, carry: 0.92, pen: 0 },
+  // (desert's pen is the lie's extra for a ball you are playing from the desert — found, playable, the same as scrub; the penalty cases live in
+  // price(): the desert shares — session L, on Michael's word that the desert is general area everywhere, D-L11)
+  const LIEFX = { 0: { disp: 1.3, carry: 0.96, pen: 0.4 }, 1: { disp: 1, carry: 1, pen: 0 }, 2: { disp: 1.3, carry: 0.96, pen: 0 }, 3: { disp: 1, carry: 1, pen: 0 }, 4: { disp: 1.6, carry: 0.92, pen: 0 },
                   5: { disp: 1.3, carry: 0.96, pen: 1 }, 6: { disp: 1.3, carry: 0.96, pen: 0 }, 7: { disp: 1.6, carry: 0.92, pen: 0 }, 8: { disp: 1.3, carry: 0.96, pen: 0.4 }, 9: { disp: 1, carry: 1, pen: 0 } };
 
   // ---------- RNG (deterministic per run) ----------
@@ -131,11 +134,19 @@
       px[i] = x + dx * club.roll * YD; py[i] = y + dy * club.roll * YD;
     }
   }
-  // Price n landings: returns mean strokes-to-hole-out (incl. penalties), odds, remaining/plays medians.
-  function price(H, px, py, n, P, base, keep) {
+  // The three outcomes of a desert ball as shares that sum to 1: played as it lies, unplayable (a stroke and a drop), lost (stroke and distance).
+  function desertShares(P) {
+    const a = Math.max(0, +(P.desert_play != null ? P.desert_play : 1)), b = Math.max(0, +(P.desert_unplayable || 0)), c = Math.max(0, +(P.desert_lost || 0)); const t = a + b + c;
+    return t <= 0 ? [1, 0, 0] : [a / t, b / t, c / t];
+  }
+  // Price n landings: returns mean strokes-to-hole-out (incl. penalties), odds, remaining/plays medians. extra = the lie you play from (its
+  // strokes, inside the expectation). A desert landing is the Rules' three outcomes by their shares: played (rough + scrub_extra), unplayable
+  // (1 + rough + desert_drop_extra), lost (1 + the same shot again — stroke and distance — solved as a fixed point: E = (1 + mean s + extra) / (1 − mean w)).
+  function price(H, px, py, n, P, base, keep, extra) {
     const fw = lut(base, "fairway"), rg = lut(base, "rough"), sd = lut(base, "sand"), gr = lut(base, "green_ft");
     const kW = descentK(P, null, 250), kL = descentK(P, null, 200), kM = descentK(P, null, 170), kWe = descentK(P, null, 100);
-    let sum = 0; const cnt = new Float64Array(10); const rem = new Float32Array(n), plays = new Float32Array(n);
+    const [dp, du, dl] = desertShares(P); const dPlay = P.scrub_extra, dDrop = P.desert_drop_extra != null ? P.desert_drop_extra : P.scrub_extra;
+    let sum = 0, wsum = 0; const cnt = new Float64Array(10); const rem = new Float32Array(n), plays = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       const x = px[i], y = py[i]; const lie = lieAt(H, x, y); cnt[lie]++;
       const r = Math.hypot(x - H.pin[0], y - H.pin[1]) / YD; const dz = H.pinFt - zAt(H, x, y);
@@ -148,13 +159,13 @@
         case L.SAND: case L.WASTE: s = baseAt(sd, pl); break;
         case L.SCRUB: s = baseAt(rg, pl) + P.scrub_extra; break;
         case L.WATER: s = baseAt(rg, pl) + 1; break;
-        default: s = baseAt(rg, pl) + P.penalty;
+        default: { const rd = baseAt(rg, pl); s = dp * (rd + dPlay) + du * (rd + dDrop) + du + dl; wsum += dl; }
       }
       if (lie !== L.GREEN && r < 50) s += P.short_game_extra || 0;   // his chips, pitches and bunker shots vs the scratch curve
       sum += s;
     }
     const odds = { green: cnt[L.GREEN] / n, fairway: (cnt[L.FAIRWAY] + cnt[L.TEE]) / n, rough: (cnt[L.ROUGH] + cnt[L.OGREEN]) / n, sand: (cnt[L.SAND] + cnt[L.WASTE]) / n, water: cnt[L.WATER] / n, desert: (cnt[L.DESERT] + cnt[L.SCRUB]) / n };
-    const res = { E: 1 + sum / n, odds, rem: median(rem), plays: median(plays) };
+    const res = { E: (1 + sum / n + (extra || 0)) / (1 - Math.min(0.95, wsum / n)), odds, rem: median(rem), plays: median(plays) };
     if (keep) { res.sample = []; for (let i = 0; i < Math.min(n, keep); i++) res.sample.push([px[i], py[i], lieAt(H, px[i], py[i])]); }
     return res;
   }
@@ -173,7 +184,7 @@
       case L.SAND: case L.WASTE: s = baseAt(lut(base, "sand"), pl); break;
       case L.SCRUB: s = baseAt(lut(base, "rough"), pl) + P.scrub_extra; break;
       case L.WATER: s = baseAt(lut(base, "rough"), pl) + 1; break;
-      default: s = baseAt(lut(base, "rough"), pl) + P.penalty;
+      default: s = baseAt(lut(base, "rough"), pl) + P.scrub_extra;   // DESERT: a position you play from is a found, playable ball (the lie's extra, no penalty)
     }
     if (lie !== L.GREEN && r < 50) s += P.short_game_extra || 0;
     return { E: s, r, plays: pl, dz, lie };
@@ -213,6 +224,7 @@
     const fromTee = ball[0] === 0 && ball[1] === 0;
     const fromLie = opts && opts.fromLie != null ? opts.fromLie : fromTee ? L.TEE : lieAt(H, ball[0], ball[1]);
     const club = opts && opts.club ? clubParams(opts.club, P, altf) : clubForDistance(plays, P, altf, fromTee);
+    const pen = (LIEFX[fromLie] || LIEFX[1]).pen;   // the lie you play from: its extra strokes (desert and scrub 0.4, water 1), inside every option's expectation
     const buf = { px: new Float32Array(n), py: new Float32Array(n) }; let best = null; const options = [];
     const ux = vx / distM, uy = vy / distM, rx = -uy, ry = ux;   // r = right-hand normal in frame (right of the shot)
     const lats = opts && opts.lats || [-12, -8, -4, 0, 4, 8, 12], depths = opts && opts.depths || [-8, 0, 8];
@@ -223,13 +235,11 @@
       if (c.shortBy != null && scale > 1.02) continue;
       if (c.shortBy == null) { const s = Math.min(scale, 1); c.carry *= s; c.roll *= s; }
       const rand = mulberry32(P.seed * 1000 + 99); shoot(H, ball, ang, c, n, rand, P, bearing, buf, fromLie);
-      const r = price(H, buf.px, buf.py, n, P, base, 0); const o = { lat, depth: dep, E: r.E, odds: r.odds, prox: r.rem * 3, ang, clubScaled: c };
+      const r = price(H, buf.px, buf.py, n, P, base, 0, pen); const o = { lat, depth: dep, E: r.E, odds: r.odds, prox: r.rem * 3, ang, clubScaled: c };
       options.push(o); if (!best || r.E < best.E) best = o;
     }
-    if (best) { const rand = mulberry32(P.seed * 1000 + 99); shoot(H, ball, best.ang, best.clubScaled, n, rand, P, bearing, buf, fromLie); best.sample = price(H, buf.px, buf.py, n, P, base, keep).sample; }
+    if (best) { const rand = mulberry32(P.seed * 1000 + 99); shoot(H, ball, best.ang, best.clubScaled, n, rand, P, bearing, buf, fromLie); best.sample = price(H, buf.px, buf.py, n, P, base, keep, pen).sample; }
     const fwT = lut(base, "fairway"), rgT = lut(base, "rough");
-    const pen = (LIEFX[fromLie] || LIEFX[1]).pen * (fromLie === 0 ? P.penalty : 1);
-    if (pen) { for (const o of options) o.E += pen; if (best) best.E += pen; }
     return { from: rem, plays, dz, club: club.name, shortBy: club.shortBy || 0, best, options, fromLie, fromPen: pen, curveFairway: baseAt(fwT, plays), curveRough: baseAt(rgT, plays) };
   }
 
@@ -255,20 +265,20 @@
           const lie = lieAt(H, buf.px[i], buf.py[i]); const r = Math.hypot(buf.px[i] - H.pin[0], buf.py[i] - H.pin[1]) / YD;
           const key = lie + ":" + Math.round(r / 15); (buckets[key] = buckets[key] || { lie, pts: [], }).pts.push([buf.px[i], buf.py[i]]);
         }
-        let Esum = 0; const shares = { fairway: 0, rough: 0, sand: 0, water: 0, desert: 0, green: 0 };
+        let Esum = 0, Wsum = 0; const shares = { fairway: 0, rough: 0, sand: 0, water: 0, desert: 0, green: 0 }; const [dp, du, dl] = desertShares(P);
         for (const key in buckets) {
           const b = buckets[key]; const m = b.pts.length; const cx = b.pts.reduce((s, p) => s + p[0], 0) / m, cy = b.pts.reduce((s, p) => s + p[1], 0) / m;
-          const a = approach(h, [cx, cy], P, altf, { n: 250, keep: 0, lats: [-6, 0, 6], depths: [0] });
-          let Eb = a.best ? a.best.E : 1 + a.curveRough; // wedge from the bucket centre, best of three aims
           const lie = b.lie;
-          if (lie === L.DESERT || lie === L.WATER) Eb += 1; else if (lie === L.SCRUB) Eb += P.scrub_extra;
+          const a = approach(h, [cx, cy], P, altf, { n: 250, keep: 0, lats: [-6, 0, 6], depths: [0], fromLie: lie });
+          let Eb = a.best ? a.best.E : 1 + a.curveRough + a.fromPen; // wedge from the bucket centre, best of three aims; the from-lie extra (water's penalty stroke, scrub's and desert's 0.4) is inside
           if (lie === L.SAND || lie === L.WASTE) Eb += Math.max(0, baseAt(lut(base, "sand"), a.plays) - baseAt(lut(base, "fairway"), a.plays));
-          else if (lie === L.ROUGH || lie === L.OGREEN || lie === L.DESERT || lie === L.WATER) Eb += Math.max(0, baseAt(lut(base, "rough"), a.plays) - baseAt(lut(base, "fairway"), a.plays));
+          else if (lie === L.ROUGH || lie === L.OGREEN || lie === L.DESERT || lie === L.WATER || lie === L.SCRUB) Eb += Math.max(0, baseAt(lut(base, "rough"), a.plays) - baseAt(lut(base, "fairway"), a.plays));
+          if (lie === L.DESERT) { const dDrop = P.desert_drop_extra != null ? P.desert_drop_extra : P.scrub_extra; Eb = dp * Eb + du * (1 + Eb - P.scrub_extra + dDrop) + dl * 1; Wsum += dl * m; }   // found and played, dropped (one more, on desert ground), lost (the lay-up again)
           Esum += Eb * m;
           const k2 = lie === L.FAIRWAY || lie === L.TEE ? "fairway" : (lie === L.SAND || lie === L.WASTE) ? "sand" : lie === L.WATER ? "water" : (lie === L.DESERT || lie === L.SCRUB) ? "desert" : lie === L.GREEN ? "green" : "rough";
           shares[k2] += m / n;
         }
-        const E = 1 + Esum / n + go.fromPen; const o = { leave, lat, E, club: c.name, shares };   // the same from-lie penalty the go carries
+        const E = (1 + Esum / n + go.fromPen) / (1 - Math.min(0.95, Wsum / n)); const o = { leave, lat, E, club: c.name, shares };   // the same from-lie extra the go carries; a lost lay-up is the lay-up again
         if (!bestL || E < bestL.E) bestL = o;
       }
       if (bestL) lays.push(bestL);
@@ -336,5 +346,5 @@
   }
 
   for (const c of D.courses) for (const h of c.holes) h._key = c.key + ":" + h.hole;
-  window.LoopEngine = { setOverrides, overrideFor, pointInPoly, decodeHole, applyPin, lieAt, zAt, clubParams, clubForDistance, teeOptions, approach, goVsLay, runHole, priceAt, corridorRule, L, YD, LIEFX, lut, baseAt, windComponents };
+  window.LoopEngine = { setOverrides, overrideFor, pointInPoly, decodeHole, applyPin, lieAt, zAt, clubParams, clubForDistance, teeOptions, approach, goVsLay, runHole, priceAt, corridorRule, desertShares, L, YD, LIEFX, lut, baseAt, windComponents };
 })();

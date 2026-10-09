@@ -58,9 +58,10 @@
       const isTee = i === 0; const pos = isTee ? [0, 0] : [s.x, s.y];
       const inFrame = isTee || (pos[0] >= h.frame.x0 - 60 && pos[0] <= h.frame.x1 + 60 && Math.abs(pos[1]) <= h.frame.w + 60);
       const gridLie = isTee ? L.TEE : E.lieAt(H, pos[0], pos[1]); let lie = s.lie != null ? s.lie : gridLie;
-      // A position you played from is playable: the engine's "desert/water = a stroke and a drop" rule is for landings. Your penalty flag
-      // is the only thing that charges a penalty stroke, so a marked lie in desert or water is priced as a rough lie (wider, shorter), not twice.
-      const playedFromHazard = lie === L.DESERT || lie === L.WATER; if (playedFromHazard) lie = L.ROUGH;
+      // A position you played from is a found, playable ball: the engine's desert shares (played / dropped / lost) are for landings it cannot
+      // see yet. Your penalty flag is the only thing that charges a penalty stroke, so a marked lie in the desert is priced as the desert lie
+      // you are playing (rough plus the lie's extra, wider, shorter) and a marked lie in water as a rough lie — never a penalty twice.
+      const playedFromHazard = lie === L.DESERT || lie === L.WATER; if (lie === L.WATER) lie = L.ROUGH;
       const rYd = distYd(pos, H.pin);
       const o = { i, pos: [round2(pos[0]), round2(pos[1])], lie, gridLie, lieSet: s.lie != null, playedFromHazard, rYd: Math.round(rYd), rFt: Math.round(rYd * 3), onGreen: lie === L.GREEN, pen: s.pen || 0, src: s.src || null, acc: s.acc != null ? Math.round(s.acc) : null, t: s.t || null, club: s.club || null, intentSet: s.intent || null, flags: [] };
       if (isTee && s.x != null && s.y != null && Math.hypot(s.x, s.y) > 40) o.flags.push(`marked ${Math.round(Math.hypot(s.x, s.y) / YD)} yd from the mapped tee; priced from the tee`);
@@ -158,7 +159,7 @@
   // full model it was started under and a stamp (curve and club-table fingerprints), and the Rounds view says when a stamp differs.
   const COND_KEYS = ["wind_mph", "wind_from", "temp_f", "setting", "pin", "pin_lat"];
   const MODEL_KEYS = ["baseline", "disp", "q_miss", "skew_right", "lat_pct", "dist_pct", "miss_lat_mult", "miss_short_pct", "miss_dist_mult", "lat_bias",
-    "penalty", "scrub_extra", "short_game_extra", "home_ft", "alt_rule", "angles", "temp_pct_per_10f", "head_pct_per_mph", "tail_pct_per_mph", "cross_yd_per_mph", "clubsOverride"];
+    "desert_play", "desert_unplayable", "desert_lost", "desert_drop_extra", "scrub_extra", "short_game_extra", "home_ft", "alt_rule", "angles", "temp_pct_per_10f", "head_pct_per_mph", "tail_pct_per_mph", "cross_yd_per_mph", "clubsOverride"];
   function fnv(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return ("0000000" + h.toString(16)).slice(-8); }
   function curveId(name) { return name + ":" + fnv(JSON.stringify(D.bases[name] || null)); }
   function modelStamp(P) { return { curve: curveId(P.baseline), clubs: fnv(JSON.stringify(D.clubs)), data: D.generated }; }
