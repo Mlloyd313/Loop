@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="41d9014155">
+<meta name="loop-build" content="9183e32ed7">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -281,6 +281,15 @@ tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
 const D = window.LOOP_DATA, E = window.LoopEngine, LG = window.LoopLedger, SW = window.LoopSwing, LIE = E.L, YD = E.YD;
 const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
 const IN_ARTIFACT = !window.LOOP_PHONE && (!!window.claude || /claude\.(ai|com)$/.test(location.hostname));   // the claude.ai copy: no print dialog, no location API
+// The artifact frame refuses a plain download link; its runtime can offer a file to save instead (the `downloads` capability, declared on
+// publish). It resolves later than this script's first run, or null where the view cannot save — the Download buttons appear only then.
+let DL = null;
+if (window.claude && typeof window.claude.use === "function") { try { window.claude.use("downloads").then(ns => { if (!ns) return; DL = ns; if (state.view === "rounds") renderRounds(); if (state.view === "swing") renderSwing(); }).catch(() => {}); } catch (e) {} }
+// Hand a text file to the viewer: the host's save (the local file, the phone build) or the artifact's own save dialog (the viewer confirms).
+function saveText(filename, text){
+  if (DL) { DL.save({ filename, data: text }).then(r => toast(r && r.status === "delivered" ? filename + " handed over." : filename + " saved.")).catch(e => { const c = e && e.code; toast(c === "declined" ? "Not saved." : c === "rate_limited" ? "A save is already open — try again in a moment." : "Could not save " + filename + (c ? " (" + c + ")" : "") + " — copy the text box instead."); }); return; }
+  const blob = new Blob([text], { type: filename.endsWith(".json") ? "application/json" : "text/plain" }); const a2 = document.createElement("a"); a2.href = URL.createObjectURL(blob); a2.download = filename; document.body.appendChild(a2); a2.click(); setTimeout(() => { URL.revokeObjectURL(a2.href); a2.remove(); }, 500);
+}
 const LIECOL = {0:"#cdb08a",1:"#6fbf5a",2:"#3f7a3a",3:"#2ecc71",4:"#ead27d",5:"#4f93dd",6:"#9fd9a8",7:"#d9c48f",8:"#a98b5c",9:"#d49ad6"};
 const ODDS = [["fairway","var(--fw)","fairway"],["rough","var(--rough)","rough"],["sand","var(--sand)","sand"],["green","var(--green)","on the green"],["water","var(--water)","water"],["desert","var(--desert)","desert / penalty"]];
 // ---------------- state ----------------
@@ -876,9 +885,9 @@ function renderRounds(){
   const o = state.openRound ? roundById(state.openRound) : null;
   if (o) html += roundDetail(o, onDone);
   // the data
-  html += `<h2>Your data</h2><p class="help" style="font-size:13px;color:var(--ink2)">Rounds live in this browser only. Copy the text below into the Rounds view of another copy of Loop (the phone build, the PC file, the artifact) to carry them over; paste there and press Import.</p>
+  html += `<h2>Your data</h2><p class="help" style="font-size:13px;color:var(--ink2)">Rounds live in this browser only. Copy the text below into the Rounds view of another copy of Loop (the phone build, the PC file, the artifact) to carry them over; paste there and press Import${!IN_ARTIFACT || DL ? " — or download the file" : ""}.</p>
     <textarea id="roundsJson" style="width:100%;height:90px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);padding:8px;font:12px/1.4 ui-monospace,Consolas,monospace">${esc(JSON.stringify(state.rounds))}</textarea>
-    <p class="help"><button id="rImport">Import what is pasted above</button> ${IN_ARTIFACT ? "" : `<button id="rDownload">Download rounds.json</button>`} <button id="rDelAll" class="quiet">${state.confirmDelAll ? "Really delete all " + state.rounds.length + " rounds?" : "Delete all rounds"}</button></p>`;
+    <p class="help"><button id="rImport">Import what is pasted above</button> ${!IN_ARTIFACT || DL ? `<button id="rDownload">Download rounds.json</button>` : ""} <button id="rDelAll" class="quiet">${state.confirmDelAll ? "Really delete all " + state.rounds.length + " rounds?" : "Delete all rounds"}</button></p>`;
   el.innerHTML = html;
   const bind = (id, fn) => { const e = $("#" + id); if (e) e.addEventListener("click", fn); };
   bind("rStart", () => startRound($("#rCourse").value));
@@ -890,7 +899,7 @@ function renderRounds(){
   $$("[data-open]").forEach(b => b.addEventListener("click", () => { state.openRound = state.openRound === b.dataset.open ? null : b.dataset.open; state.confirmDel = null; renderRounds(); }));
   $$("[data-del]").forEach(b => b.addEventListener("click", () => { const id = b.dataset.del; if (state.confirmDel === id) { state.rounds = state.rounds.filter(r => r.id !== id); if (state.activeRound === id) state.activeRound = null; if (state.openRound === id) state.openRound = null; delete state.ledger[id]; state.confirmDel = null; saveRounds(); renderRounds(); toast("Round deleted."); } else { state.confirmDel = id; renderRounds(); setTimeout(() => { if (state.confirmDel === id) { state.confirmDel = null; if (state.view === "rounds") renderRounds(); } }, 4000); } }));
   bind("rImport", () => { try { let v = JSON.parse($("#roundsJson").value); if (v && v.rounds) v = v.rounds; if (!Array.isArray(v)) throw new Error("not a list"); let added = 0, replaced = 0; for (const r of v) { if (!r || !r.id || !r.course || !course_(r.course)) continue; const i = state.rounds.findIndex(x => x.id === r.id); if (i >= 0) { state.rounds[i] = r; replaced++; } else { state.rounds.push(r); added++; } delete state.ledger[r.id]; } saveRounds(); renderRounds(); toast(`Imported ${added} new round${added===1?"":"s"}${replaced ? `, updated ${replaced}` : ""}.`); } catch (e) { toast("Could not read that as rounds JSON (" + e.message + ")."); } });
-  bind("rDownload", () => { const blob = new Blob([JSON.stringify(state.rounds, null, 1)], { type: "application/json" }); const a2 = document.createElement("a"); a2.href = URL.createObjectURL(blob); a2.download = "loop-rounds-" + today() + ".json"; document.body.appendChild(a2); a2.click(); setTimeout(() => { URL.revokeObjectURL(a2.href); a2.remove(); }, 500); });
+  bind("rDownload", () => saveText("loop-rounds-" + today() + ".json", JSON.stringify(state.rounds, null, 1)));
   bind("rDelAll", () => { if (state.confirmDelAll) { state.rounds = []; state.activeRound = null; state.openRound = null; state.ledger = {}; state.confirmDelAll = false; saveRounds(); renderRounds(); toast("All rounds deleted."); } else { state.confirmDelAll = true; renderRounds(); setTimeout(() => { if (state.confirmDelAll) { state.confirmDelAll = false; if (state.view === "rounds") renderRounds(); } }, 4000); } });
   $$("#viewRounds [data-gohole]").forEach(x => x.addEventListener("click", ev => { ev.preventDefault(); const [ck, hn] = x.dataset.gohole.split(":"); if (ck !== state.course) { state.course = ck; store.set("course", ck); } state.hole = +hn; store.set("hole", state.hole); state.tap = null; renderHeader(); setView("hole"); }));
 }
@@ -1090,7 +1099,7 @@ function renderSwing(){
   // the data
   html += `<h2>Your data</h2><p class="help" style="font-size:13px;color:var(--ink2)">Swing sessions and practice notes live in this browser only (the videos stay on the PC). Copy this text into another copy of Loop's Swing view to carry them over.</p>
     <textarea id="swJson">${esc(JSON.stringify({ schema: "loop.swings/1", sessions: state.swings, practice: state.practice }))}</textarea>
-    <p class="help"><button id="swImport">Import what is pasted above</button> ${IN_ARTIFACT ? "" : `<button id="swDownload">Download swings.json</button>`}</p>`;
+    <p class="help"><button id="swImport">Import what is pasted above</button> ${!IN_ARTIFACT || DL ? `<button id="swDownload">Download swings.json</button>` : ""}</p>`;
   el.innerHTML = html;
   // bindings
   const bind = (id, fn) => { const e = $("#" + id); if (e) e.addEventListener("click", fn); };
@@ -1099,7 +1108,7 @@ function renderSwing(){
   const fi = $("#swFile"); if (fi) fi.addEventListener("change", async () => { const tot = { added: 0, replaced: 0, bad: 0, pc: 0, lastId: null }; for (const f of fi.files) { try { const r = importSwingJson(JSON.parse(await f.text()), defaults()); for (const k of ["added", "replaced", "bad", "pc"]) tot[k] += r[k]; tot.lastId = r.lastId || tot.lastId; } catch (e) { tot.bad++; } } done(tot); });
   bind("swPasteGo", () => { try { done(importSwingJson(JSON.parse($("#swPaste").value), defaults())); } catch (e) { toast("Could not read that as JSON (" + e.message + ")."); } });
   bind("swImport", () => { try { done(importSwingJson(JSON.parse($("#swJson").value), null)); } catch (e) { toast("Could not read that as JSON (" + e.message + ")."); } });
-  bind("swDownload", () => { const blob = new Blob([JSON.stringify({ schema: "loop.swings/1", sessions: state.swings, practice: state.practice }, null, 1)], { type: "application/json" }); const a2 = document.createElement("a"); a2.href = URL.createObjectURL(blob); a2.download = "loop-swings-" + today() + ".json"; document.body.appendChild(a2); a2.click(); setTimeout(() => { URL.revokeObjectURL(a2.href); a2.remove(); }, 500); });
+  bind("swDownload", () => saveText("loop-swings-" + today() + ".json", JSON.stringify({ schema: "loop.swings/1", sessions: state.swings, practice: state.practice }, null, 1)));
   $$("[data-swopen]").forEach(b => b.addEventListener("click", () => { state.openSwing = state.openSwing === b.dataset.swopen ? null : b.dataset.swopen; state.confirmSwDel = null; renderSwing(); }));
   $$("[data-swdel]").forEach(b => b.addEventListener("click", () => { const id = b.dataset.swdel; if (state.confirmSwDel === id) { state.swings = state.swings.filter(s => s.id !== id); if (state.openSwing === id) state.openSwing = null; state.confirmSwDel = null; saveSwings(); renderSwing(); toast("Session deleted."); } else { state.confirmSwDel = id; renderSwing(); setTimeout(() => { if (state.confirmSwDel === id) { state.confirmSwDel = null; if (state.view === "swing") renderSwing(); } }, 4000); } }));
   $$("[data-swset]").forEach(i => i.addEventListener("change", () => { if (!open) return; const k = i.dataset.swset; open[k] = i.value || (k === "golfer" ? "unknown" : null); saveSwings(); renderSwing(); }));
