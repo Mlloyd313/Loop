@@ -156,7 +156,7 @@
   // Before this, a round stored only the settings that differed from the build's defaults, so every later change to the defaults, the
   // baseline curve or the dispersion silently re-priced old rounds while the page still said "scratch baseline". A round now carries the
   // full model it was started under and a stamp (curve and club-table fingerprints), and the Rounds view says when a stamp differs.
-  const COND_KEYS = ["wind_mph", "wind_from", "temp_f", "setting", "pin"];
+  const COND_KEYS = ["wind_mph", "wind_from", "temp_f", "setting", "pin", "pin_lat"];
   const MODEL_KEYS = ["baseline", "disp", "q_miss", "skew_right", "lat_pct", "dist_pct", "miss_lat_mult", "miss_short_pct", "miss_dist_mult", "lat_bias",
     "penalty", "scrub_extra", "short_game_extra", "home_ft", "alt_rule", "angles", "temp_pct_per_10f", "head_pct_per_mph", "tail_pct_per_mph", "cross_yd_per_mph", "clubsOverride"];
   function fnv(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return ("0000000" + h.toString(16)).slice(-8); }
@@ -198,7 +198,7 @@
       for (const s of a.shots) for (const f of s.flags) flags.push({ hole: h.hole, shot: s.i + 1, text: f });
     }
     for (const cc in cats) cats[cc].sg = round2(cats[cc].sg);
-    const res = { id: round.id, course: c.key, courseName: c.club === c.name ? c.name : c.club + " — " + c.name, date: round.date, name: round.name || null, sample: !!round.sample, legacy: !!round.legacy, holes, nScored, nMarked, nComplete, nHoles: Object.keys(holes).length, score: nScored ? score_sum : null, E_tee: nScored ? round2(E_sum) : null, sgTotal: nScored ? round2(E_sum - score_sum) : null, cats, flags, P: { wind_mph: P.wind_mph, wind_from: P.wind_from, temp_f: P.temp_f, setting: P.setting, pin: P.pin, baseline: P.baseline, disp: P.disp } };
+    const res = { id: round.id, course: c.key, courseName: c.club === c.name ? c.name : c.club + " — " + c.name, date: round.date, name: round.name || null, sample: !!round.sample, legacy: !!round.legacy, holes, nScored, nMarked, nComplete, nHoles: Object.keys(holes).length, score: nScored ? score_sum : null, E_tee: nScored ? round2(E_sum) : null, sgTotal: nScored ? round2(E_sum - score_sum) : null, cats, flags, P: { wind_mph: P.wind_mph, wind_from: P.wind_from, temp_f: P.temp_f, setting: P.setting, pin: P.pin, pin_lat: P.pin_lat || 0, baseline: P.baseline, disp: P.disp } };
     res.patterns = patterns(res); res.review = review(res, opts && opts.history || []);
     return res;
   }
@@ -299,7 +299,7 @@
     const c = D.courses.find(x => x.key === courseKey); const P = Object.assign({}, D.defaults, P0 || {}); const altf = 1 + P.alt_rule / 100 * (c.alt_ft - P.home_ft) / 1000;
     let a = (seed || 1) >>> 0; const rand = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
     const pick = arr => arr[Math.floor(rand() * arr.length)];
-    const round = { id: "sim_" + courseKey + "_" + (seed || 1), course: courseKey, date: (opts && opts.date) || new Date().toISOString().slice(0, 10), started: new Date().toISOString(), tees: c.tees, P: { wind_mph: P.wind_mph, wind_from: P.wind_from, temp_f: P.temp_f, setting: P.setting, pin: P.pin }, sample: true, name: "Sample round — simulated by the engine, not your golf", holes: {} };
+    const round = { id: "sim_" + courseKey + "_" + (seed || 1), course: courseKey, date: (opts && opts.date) || new Date().toISOString().slice(0, 10), started: new Date().toISOString(), tees: c.tees, P: { wind_mph: P.wind_mph, wind_from: P.wind_from, temp_f: P.temp_f, setting: P.setting, pin: P.pin, pin_lat: P.pin_lat || 0 }, sample: true, name: "Sample round — simulated by the engine, not your golf", holes: {} };
     const gr = E.lut(P.baseline, "green_ft");
     // opts.execP: the day's execution differs from the pattern the player aims with (a bad — or good — swing day): targets are chosen
     // with P, shots are drawn with P + execP at those same targets. Benchmarks only (Today mode, H1); the round keeps the truth.

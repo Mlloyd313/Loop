@@ -4,6 +4,7 @@
   const YD = 0.9144;
   const L = { DESERT: 0, FAIRWAY: 1, ROUGH: 2, GREEN: 3, SAND: 4, WATER: 5, OGREEN: 6, WASTE: 7, SCRUB: 8, TEE: 9 };
   const D = window.LOOP_DATA;
+  if (D.defaults.pin_lat == null) D.defaults.pin_lat = 0;   // the tucked pin (session L): data.js built before it carries the default from its next rebuild
   // from-lie effects on the next shot: dispersion multiplier, carry factor, penalty strokes before the shot
   const LIEFX = { 0: { disp: 1.3, carry: 0.96, pen: 1 }, 1: { disp: 1, carry: 1, pen: 0 }, 2: { disp: 1.3, carry: 0.96, pen: 0 }, 3: { disp: 1, carry: 1, pen: 0 }, 4: { disp: 1.6, carry: 0.92, pen: 0 },
                   5: { disp: 1.3, carry: 0.96, pen: 1 }, 6: { disp: 1.3, carry: 0.96, pen: 0 }, 7: { disp: 1.6, carry: 0.92, pen: 0 }, 8: { disp: 1.3, carry: 0.96, pen: 0.4 }, 9: { disp: 1, carry: 1, pen: 0 } };
@@ -60,10 +61,14 @@
     if (overridden) { H.pinFt = zAt(H, basePin[0], basePin[1]); H.basePinFt = H.pinFt; }
     return h._dec = H;
   }
-  // pin position: front / middle / back = a third of the green's depth along the last segment of the hole line
+  // pin position: front / middle / back = a third of the green's depth along the last segment of the hole line; pin_lat = yards beside
+  // that line (+ right, − left, as seen from the fairway; 0 = on the line), the tucked pin (session L). The pin's elevation is the data's
+  // at the base pin and the DEM's wherever the pin is moved (mirrors engine.py apply_pin).
   function applyPin(H, P) {
-    const s = P.pin === "front" ? -1 : P.pin === "back" ? 1 : 0; const d = s * H.depth / 3;
-    H.pin[0] = H.basePin[0] + H.dir[0] * d; H.pin[1] = H.basePin[1] + H.dir[1] * d; H.pinFt = H.basePinFt == null ? (H.basePinFt = H.pinFt) : zAt(H, H.pin[0], H.pin[1]);
+    if (H.basePinFt == null) H.basePinFt = H.pinFt;
+    const s = P.pin === "front" ? -1 : P.pin === "back" ? 1 : 0; const d = s * H.depth / 3; const lat = (+P.pin_lat || 0) * YD;
+    H.pin[0] = H.basePin[0] + H.dir[0] * d - H.dir[1] * lat; H.pin[1] = H.basePin[1] + H.dir[1] * d + H.dir[0] * lat;
+    H.pinFt = (d === 0 && lat === 0) ? H.basePinFt : zAt(H, H.pin[0], H.pin[1]);
   }
   function lieAt(H, x, y) { const ix = ((x - H.x0) / H.cell) | 0, iy = ((y + H.w) / H.cell) | 0; if (ix < 0 || ix >= H.nx || iy < 0 || iy >= H.ny) return L.DESERT; return H.lie[iy * H.nx + ix]; }
   function zAt(H, x, y) {

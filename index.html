@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="5f5cf4c60e">
+<meta name="loop-build" content="41d9014155">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -239,6 +239,7 @@ tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
     <label>Temp <input type="number" id="q_temp" min="30" max="120" style="width:56px">°F</label>
     <label>Turf <select id="q_turf"><option value="firm">firm</option><option value="soft">soft</option></select></label>
     <label>Pin <select id="q_pin"><option>front</option><option>middle</option><option>back</option></select></label>
+    <label title="A pin tucked to one side of the green, as seen from the fairway: the engine's target, odds and prices follow it (a tucked pin beside sand or water is the short-siding case)">Tucked <select id="q_pinlat"><option value="0">no</option><option value="-4">4 yd left</option><option value="-8">8 yd left</option><option value="-12">12 yd left</option><option value="4">4 yd right</option><option value="8">8 yd right</option><option value="12">12 yd right</option></select></label>
     <button id="q_apply">Apply</button>
     <button id="q_forecast" class="noprint" title="Fill the wind and temperature from the current forecast for this course (Open-Meteo, no account; nothing about you is sent)">Use the forecast</button><span id="q_fsrc" style="font-size:12px;color:var(--mute)"></span>
   </div>
@@ -298,13 +299,14 @@ E.setOverrides(state.overrides);
 function hole(){ return course().holes.find(h => h.hole === state.hole) || course().holes[0]; }
 function altf(c){ return 1 + state.P.alt_rule/100 * (c.alt_ft - state.P.home_ft)/1000; }
 function planClubFor(c, h){ const o = state.planClubs[c.key+":"+h.hole]; return o === undefined ? h.plan.club : o; }
-function phash(){ const p = state.P; return JSON.stringify([p.setting,p.baseline,p.disp,p.q_miss,p.skew_right,p.wind_mph,p.wind_from,p.temp_f,p.pin,p.alt_rule,p.home_ft,p.lat_pct,p.dist_pct,p.clubsOverride||null,p.penalty,p.scrub_extra,p.short_game_extra||0,p.n]); }
+function phash(){ const p = state.P; return JSON.stringify([p.setting,p.baseline,p.disp,p.q_miss,p.skew_right,p.wind_mph,p.wind_from,p.temp_f,p.pin,p.pin_lat||0,p.alt_rule,p.home_ft,p.lat_pct,p.dist_pct,p.clubsOverride||null,p.penalty,p.scrub_extra,p.short_game_extra||0,p.n]); }
 function fmt(x, d=2){ return x==null||isNaN(x) ? "–" : (+x).toFixed(d); }
 function pct(x){ return x==null ? "–" : Math.round(x*100)+"%"; }
 function sgn(x, d=2){ return x==null ? "–" : (x>0?"+":"")+(+x).toFixed(d); }
 function aimText(a, atYd){ if (a===0) return "straight at the pin line"; const yd = atYd ? Math.round(Math.tan(Math.abs(a)*Math.PI/180)*atYd) : 0; return Math.abs(a)+"° "+(a<0?"left":"right")+(yd?` — about ${yd} yd ${a<0?"left":"right"} of the pin line at ${Math.round(atYd)}`:" of the pin line"); }
 function aimShort(a){ return a===0? "0°" : Math.abs(a)+"° "+(a<0?"L":"R"); }
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("on"), 2600); }
+function pinText(P){ const p=P||state.P; const l=+p.pin_lat||0; return "pin "+p.pin+(l?`, tucked ${Math.abs(l)} yd ${l<0?"left":"right"}`:""); }
 function windText(){ const p=state.P; if(!(p.wind_mph>0)) return "calm"; const dirs=["N","NE","E","SE","S","SW","W","NW"]; return p.wind_mph+" mph from "+dirs[Math.round(((p.wind_from%360)+360)%360/45)%8]; }
 // ---------------- results (cached per course × settings) ----------------
 function resultKey(c){ return c.key+"|"+phash()+"|"+JSON.stringify(Object.keys(state.planClubs).filter(k=>k.startsWith(c.key+":")).map(k=>[k,state.planClubs[k]])); }
@@ -329,7 +331,7 @@ function renderHeader(){
   const c = course(); const R = getResults(c);
   $("#holeStrip").innerHTML = c.holes.map(h => `<button role="tab" aria-current="${h.hole===state.hole}" data-hole="${h.hole}" title="Par ${h.par}, ${h.card} yards">${h.hole}<small>${h.par}·${h.card}</small></button>`).join("");
   const cur = $("#holeStrip button[aria-current='true']"); if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest", inline: "center" });
-  $("#condChip").innerHTML = `<span>${windText()}</span><span>${state.P.temp_f}°F</span><span>${state.P.setting}</span><span>pin ${state.P.pin}</span>`;
+  $("#condChip").innerHTML = `<span>${windText()}</span><span>${state.P.temp_f}°F</span><span>${state.P.setting}</span><span>${pinText()}</span>`;
   $("#condChip").title = state.condNote ? "Today's conditions — " + state.condNote : "Today's conditions";
   $$("nav.views button").forEach(b => b.setAttribute("aria-current", b.dataset.view===state.view ? "page" : "false"));
 }
@@ -389,7 +391,7 @@ function drawMap(h, r){
       for (const yd of [250,275,300,325,350]) { const rpx = yd*YD/f.res; const [cx,cy] = px(0,0); ctx.beginPath(); ctx.arc(cx, cy, rpx, Math.PI*1.15, Math.PI*1.85); ctx.stroke(); ctx.fillStyle="rgba(255,255,255,.9)"; ctx.fillText(String(yd), cx + rpx*Math.cos(Math.PI*1.13)-4, cy + rpx*Math.sin(Math.PI*1.13)+4); }
       ctx.restore(); }
     // hole line (its last point follows a moved green)
-    const ovr = E.overrideFor(h); const hline = ovr ? h.line.slice(0, -1).concat([ovr.pin]) : h.line; const pinPt = ovr ? ovr.pin : h.pin;
+    const ovr = E.overrideFor(h); const hline = ovr ? h.line.slice(0, -1).concat([ovr.pin]) : h.line; const Hd = E.decodeHole(h); E.applyPin(Hd, state.P); const pinPt = Hd.pin.slice();   // the pin of the day (front / middle / back, tucked)
     ctx.save(); ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=2; ctx.setLineDash([]); ctx.beginPath(); hline.forEach((p,i)=>{ const [a,b]=px(p[0],p[1]); i?ctx.lineTo(a,b):ctx.moveTo(a,b); }); ctx.stroke(); ctx.restore();
     // engine pick: aim window fan + line + landing cloud
     if (r && r.kind==="tee") {
@@ -432,7 +434,7 @@ function drawMap(h, r){
 // Price map: strokes to hole out from every 2-yd cell = baseline(lie, plays-like distance) + penalties. Cheap, no simulation.
 const priceCache = {};
 function priceGrid(h){
-  const key = h.frame.img + "|" + state.P.baseline + "|" + state.P.pin + "|" + state.P.penalty + "|" + state.P.scrub_extra;
+  const key = h.frame.img + "|" + state.P.baseline + "|" + state.P.pin + "|" + (state.P.pin_lat||0) + "|" + state.P.penalty + "|" + state.P.scrub_extra;
   if (priceCache[key]) return priceCache[key];
   const H = E.decodeHole(h); E.applyPin(H, state.P); const base = state.P.baseline; const fw = E.lut(base,"fairway"), rg = E.lut(base,"rough"), sd = E.lut(base,"sand"), gr = E.lut(base,"green_ft");
   const A = state.P.angles; const kk = d => 1/Math.tan((d>235?A.wood:d>195?A.long:d>150?A.mid:A.wedge)*Math.PI/180);
@@ -795,7 +797,7 @@ function renderRound(){
   for (const {h,r} of rows) { if (!r || r.E==null) continue; engE += r.E; nE++; parE += h.par; if (r.planE!=null) { planE += r.planE - r.E; nPlan++; } }
   let html = `<h1 style="font-family:var(--num);font-size:28px;margin:4px 0 2px">${c.club === c.name ? c.name : c.club+" — "+c.name}<span style="display:block;font:14px var(--font);color:var(--ink2);margin-top:4px">${c.tees} · par ${c.par} · ${c.yards.toLocaleString()} yards · ${c.alt_ft.toLocaleString()} ft · ${c.city}</span></h1>`;
   const dq = dataQuality(c);
-  html += `<div class="progress">${done<c.holes.length?`Pricing the course… ${done} of ${c.holes.length} holes`:`All ${c.holes.length} holes priced under today's settings (${windText()}, ${state.P.temp_f}°F, ${state.P.setting}, pin ${state.P.pin}).`} Map: <b>${dq.verdict}</b> — ${dq.text}.</div>`;
+  html += `<div class="progress">${done<c.holes.length?`Pricing the course… ${done} of ${c.holes.length} holes`:`All ${c.holes.length} holes priced under today's settings (${windText()}, ${state.P.temp_f}°F, ${state.P.setting}, ${pinText()}).`} Map: <b>${dq.verdict}</b> — ${dq.text}.</div>`;
   html += `<div class="kpis"><div class="kpi engine"><div class="v num">${nE?fmt(engE,1):"–"}</div><div class="l">model strokes on the ${nE} priced holes (par ${parE}) playing the engine's lines</div></div>
     <div class="kpi plan"><div class="v num">${nPlan?sgn(planE,1):"–"}</div><div class="l">what the plan's tee clubs cost per round where they differ (${nPlan} holes with a plan club)</div></div>
     <div class="kpi"><div class="v num">${rows.filter(x=>x.r&&x.r.goLay&&x.r.goLay.delta>0.1).length}</div><div class="l">par 5s where going for the green beats laying up by more than 0.1</div></div></div>`;
@@ -825,7 +827,7 @@ function renderRound(){
   const pb = $("#printPocket"); if (pb) pb.addEventListener("click", () => { renderPocket(); window.print(); });
 }
 function renderPocket(){
-  const c = course(); const R = getResults(c); let html = `<h1>${c.club} — ${c.name} · ${c.tees}</h1><div class="sub">Loop pocket card · ${windText()}, ${state.P.temp_f}°F, ${state.P.setting}, pin ${state.P.pin} · generated ${new Date().toLocaleDateString()}</div><table><thead><tr><th>#</th><th>Par</th><th>Yds</th><th>Tee</th><th>Line</th><th>Then</th><th>Call</th><th>Plan says</th></tr></thead><tbody>`;
+  const c = course(); const R = getResults(c); let html = `<h1>${c.club} — ${c.name} · ${c.tees}</h1><div class="sub">Loop pocket card · ${windText()}, ${state.P.temp_f}°F, ${state.P.setting}, ${pinText()} · generated ${new Date().toLocaleDateString()}</div><table><thead><tr><th>#</th><th>Par</th><th>Yds</th><th>Tee</th><th>Line</th><th>Then</th><th>Call</th><th>Plan says</th></tr></thead><tbody>`;
   for (const h of c.holes) { const r = R.holes[h.hole]; let tee="–", line="", then="", call="";
     if (r && r.kind==="tee") { const o=r.options[0]; tee=o.club; const ly = r.landing ? Math.round(Math.tan(Math.abs(o.best.aim)*Math.PI/180)*Math.hypot(r.landing[0],r.landing[1])/YD) : 0; line=aimShort(o.best.aim)+(ly?" ≈ "+ly+" yd "+(o.best.aim<0?"L":"R"):"")+" (win "+aimShort(o.window[0])+"–"+aimShort(o.window[1])+")"; then=`${Math.round(o.best.rem)} → plays ${Math.round(o.best.plays)}${r.approach?", "+r.approach.club:""}`; if (r.goLay&&r.goLay.delta!=null) call = r.goLay.delta>0.05?`go (+${fmt(r.goLay.delta)})`:`lay up ${r.goLay.lay.leave}`; }
     else if (r && r.kind==="par3") { tee=r.approach.club; then=`plays ${Math.round(r.approach.plays)} (${sgn(r.approach.dz,0)} ft)`; }
@@ -840,7 +842,7 @@ function renderRounds(){
   let html = `<h1>Rounds</h1><p style="color:var(--ink2);max-width:74ch;margin:0 0 10px">Mark the ball before every shot and Loop prices each position with its own engine on this ground: what every shot was worth against the engine's expectation, what a decision cost against what the swing cost, and what it adds up to over rounds. Loop sees where the ball went, never how you swung.</p>`;
   if (a) { const nS = Object.values(a.holes||{}).filter(x => x.score != null).length, nM = Object.values(a.holes||{}).reduce((s, x) => s + (x.shots||[]).length, 0);
     html += `<div class="banner"><div><b>In progress:</b> ${esc(roundLabel(a))} · ${nS} hole${nS===1?"":"s"} scored · ${nM} mark${nM===1?"":"s"}</div><div class="tools" style="margin-left:auto;display:flex;gap:6px"><button id="rContinue">Continue</button><button id="rFinish">Finish round</button><button id="rAbandon" class="quiet" title="Delete the round in progress">Abandon</button></div></div>`; }
-  else html += `<div class="banner" style="border-color:var(--rule)"><label>Start a round on <select id="rCourse">${D.courses.map(c => `<option value="${c.key}" ${c.key===state.course?"selected":""}>${esc(c.club === c.name ? c.name : c.club + " — " + c.name)}</option>`).join("")}</select></label><label style="color:var(--ink2)">under today's conditions (${windText()}, ${state.P.temp_f}°F, ${state.P.setting}, pin ${state.P.pin})</label><button id="rStart" style="background:var(--engine);color:#fff;border-color:transparent;font-weight:600">▶ Start</button></div>`;
+  else html += `<div class="banner" style="border-color:var(--rule)"><label>Start a round on <select id="rCourse">${D.courses.map(c => `<option value="${c.key}" ${c.key===state.course?"selected":""}>${esc(c.club === c.name ? c.name : c.club + " — " + c.name)}</option>`).join("")}</select></label><label style="color:var(--ink2)">under today's conditions (${windText()}, ${state.P.temp_f}°F, ${state.P.setting}, ${pinText()})</label><button id="rStart" style="background:var(--engine);color:#fff;border-color:transparent;font-weight:600">▶ Start</button></div>`;
   // the player model over real rounds
   const real = rounds.filter(r => !r.sample && !r.legacy && Object.values(r.holes||{}).some(x => x.score != null)); const analyses = []; let pending = 0;
   for (const r of real) { const L = state.ledger[r.id]; if (L && L.res) analyses.push(L.res); else { pending++; ledgerRound(r, onDone); } }
@@ -899,7 +901,7 @@ function roundDetail(r, onDone){
   let html = `<h2 style="margin-top:26px">${esc(roundLabel(r))}${r.id===state.activeRound ? " — in progress" : ""}</h2>`;
   if (r.sample) html += `<div class="sample" style="margin-bottom:10px">A sample round: the engine played itself here, drawing every shot from its own distributions (the plan's tee club every third hole, so the decision line has something to show). It is not your golf and is never counted in your game above.</div>`;
   if (!res) { html += `<div class="progress">Pricing the round… the engine runs every hole you marked under that day's settings.</div>`; return html; }
-  const P = res.P; html += `<div class="progress">Priced under ${P.wind_mph > 0 ? P.wind_mph + " mph from " + P.wind_from + "°" : "calm"}, ${P.temp_f}°F, ${P.setting}, pin ${P.pin}, ${P.baseline} baseline, dispersion ${Math.round(P.disp*100)}% — the settings when the round was started${r.P && r.P._stamp ? ` (curve ${esc(r.P._stamp.curve)}${r.P._stamp.assumed ? ", stamped on first load" : ""})` : ""}. ${res.nScored} of ${c.holes.length} holes scored, ${res.nComplete} fully marked.</div>${(() => { const d = LG.stampDrift(r, null); return d.length ? `<p class="help" style="font-size:12.5px;color:var(--engine)">Model changed since this round: ${esc(d.join("; "))}. It is priced with its own settings on today's data; compare it with newer rounds knowing the yardstick moved.</p>` : ""; })()}`;
+  const P = res.P; html += `<div class="progress">Priced under ${P.wind_mph > 0 ? P.wind_mph + " mph from " + P.wind_from + "°" : "calm"}, ${P.temp_f}°F, ${P.setting}, ${pinText(P)}, ${P.baseline} baseline, dispersion ${Math.round(P.disp*100)}% — the settings when the round was started${r.P && r.P._stamp ? ` (curve ${esc(r.P._stamp.curve)}${r.P._stamp.assumed ? ", stamped on first load" : ""})` : ""}. ${res.nScored} of ${c.holes.length} holes scored, ${res.nComplete} fully marked.</div>${(() => { const d = LG.stampDrift(r, null); return d.length ? `<p class="help" style="font-size:12.5px;color:var(--engine)">Model changed since this round: ${esc(d.join("; "))}. It is priced with its own settings on today's data; compare it with newer rounds knowing the yardstick moved.</p>` : ""; })()}`;
   html += `<div class="kpis"><div class="kpi"><div class="v num">${res.score != null ? res.score : "–"}</div><div class="l">your score on the ${res.nScored} scored holes</div></div><div class="kpi engine"><div class="v num">${res.E_tee != null ? fmt(res.E_tee,1) : "–"}</div><div class="l">the engine's expectation from those tees</div></div><div class="kpi"><div class="v num" style="color:${res.sgTotal<0?"var(--engine)":"var(--ok)"}">${res.sgTotal != null ? sgn(res.sgTotal,1) : "–"}</div><div class="l">strokes gained against the engine</div></div></div>`;
   html += `<div class="catbar">${["tee","approach","layup","short","putt","finish","decision"].filter(cc => res.cats[cc].n).map(cc => `<div><div class="v num ${sgClass(res.cats[cc].sg)}">${sgn(res.cats[cc].sg)}</div><div class="l">${LG.CAT_LABEL[cc]} · ${res.cats[cc].n}</div></div>`).join("")}</div>`;
   if (res.nComplete < res.nScored) html += `<p class="help" style="font-size:12.5px;color:var(--mute)">Categories count only the ${res.nComplete} holes with every shot marked; the round's total counts every scored hole.</p>`;
@@ -1178,6 +1180,7 @@ function renderSettings(){
     <label>Temperature (°F) <input type="number" id="s_temp_f" min="30" max="120" step="1" value="${P.temp_f}"></label>
     <label>Turf <select id="s_setting"><option value="firm" ${P.setting==="firm"?"selected":""}>firm</option><option value="soft" ${P.setting==="soft"?"selected":""}>soft (overseed)</option></select></label>
     <label>Pin position <select id="s_pin"><option ${P.pin==="front"?"selected":""}>front</option><option ${P.pin==="middle"?"selected":""}>middle</option><option ${P.pin==="back"?"selected":""}>back</option></select></label>
+    <label title="Yards the pin sits beside the hole line, as seen from the fairway (− left, + right, 0 on the line). A pin tucked beside sand or water is the short-siding case: the engine's best target moves to the safe side and the pin itself costs more (pipeline/bench_pins.py)">Pin tucked (yd, − left / + right) <input type="number" id="s_pinlat" min="-20" max="20" step="1" value="${+P.pin_lat||0}"></label>
     <p class="help">Wind is a caddie's rule of thumb: ${P.head_pct_per_mph}% of carry per mph into, ${P.tail_pct_per_mph}% per mph with, ${P.cross_yd_per_mph} yd of drift per mph across for a 300-yard shot. Every hole uses its own bearing. The conditions chip at the top can fill the wind and temperature from the current forecast at the course (Open-Meteo's 10-m wind; not in the artifact copy, whose frame refuses the network) — a forecast, not a measurement: the chip's tooltip says when it was taken.</p>
   </section>
   <section><h3>You</h3>
@@ -1215,7 +1218,7 @@ Driver, 302, 328
     <p class="help"><button id="resetAll">Reset every setting</button> <span style="color:var(--mute)">Rounds and their scores are managed on the Rounds view (export, import, delete).</span></p>
   </section>`;
   const bind = (id, key, parse=parseFloat) => { const e = $("#"+id); e.addEventListener("change", () => { state.P[key] = parse(e.value); if (key==="aim_max") state.P.aim_min = -state.P.aim_max; saveP(); renderSettings(); }); };
-  bind("s_wind_mph","wind_mph"); bind("s_wind_from","wind_from"); bind("s_temp_f","temp_f"); bind("s_setting","setting",v=>v); bind("s_pin","pin",v=>v); bind("s_home_ft","home_ft"); bind("s_baseline","baseline",v=>v); bind("s_short_game_extra","short_game_extra"); bind("s_penalty","penalty"); bind("s_n","n",v=>parseInt(v,10)); bind("s_aim_max","aim_max",v=>parseInt(v,10));
+  bind("s_wind_mph","wind_mph"); bind("s_wind_from","wind_from"); bind("s_temp_f","temp_f"); bind("s_setting","setting",v=>v); bind("s_pin","pin",v=>v); bind("s_pinlat","pin_lat",v=>Math.max(-20,Math.min(20,parseFloat(v)||0))); bind("s_home_ft","home_ft"); bind("s_baseline","baseline",v=>v); bind("s_short_game_extra","short_game_extra"); bind("s_penalty","penalty"); bind("s_n","n",v=>parseInt(v,10)); bind("s_aim_max","aim_max",v=>parseInt(v,10));
   for (const [id,key,disp] of [["s_disp","disp","s_disp_v"],["s_q_miss","q_miss","s_q_miss_v"],["s_skew_right","skew_right","s_skew_v"]]) { const e=$("#"+id); e.addEventListener("input", ()=>{ $("#"+disp).textContent = Math.round(e.value*100)+"%"; }); e.addEventListener("change", ()=>{ state.P[key]=parseFloat(e.value); saveP(); }); }
   $$(".clubs input").forEach(i => i.addEventListener("change", () => { const ov = state.P.clubsOverride ? state.P.clubsOverride.slice() : []; let o = ov.find(x=>x.name===i.dataset.club); if (!o) { const base = D.clubs.find(c=>c.name===i.dataset.club); o = Object.assign({}, base); ov.push(o); } o[i.dataset.f] = parseFloat(i.value); state.P.clubsOverride = ov; saveP(); }));
   $("#resetClubs").addEventListener("click", () => { delete state.P.clubsOverride; saveP(); renderSettings(); });
@@ -1236,7 +1239,7 @@ function saveP(){ const keep = {}; for (const k in state.P) if (JSON.stringify(s
 function setView(v){ state.view = v; for (const id of ["hole","round","rounds","swing","audit","settings"]) $("#view"+id[0].toUpperCase()+id.slice(1)).hidden = id!==v; renderHeader();
   if (v==="hole") renderHole(); if (v==="round") renderRound(); if (v==="rounds") renderRounds(); if (v==="swing") renderSwing(); if (v==="audit") renderAudit(); if (v==="settings") renderSettings(); if (v==="round"||v==="audit") startBackground(); window.scrollTo(0,0); }
 function startBackground(){ const c = course(); computeCourse(c, (done, total, complete) => { if (state.view==="round") renderRound(); if (state.view==="audit") renderAudit(); }); }
-$("#condChip").addEventListener("click", () => { const q = $("#quick"); const open = q.hidden; q.hidden = !open; $("#condChip").setAttribute("aria-expanded", String(open)); if (open) { $("#q_wind").value = state.P.wind_mph; $("#q_from").value = state.P.wind_from; $("#q_temp").value = state.P.temp_f; $("#q_turf").value = state.P.setting; $("#q_pin").value = state.P.pin; } });
+$("#condChip").addEventListener("click", () => { const q = $("#quick"); const open = q.hidden; q.hidden = !open; $("#condChip").setAttribute("aria-expanded", String(open)); if (open) { $("#q_wind").value = state.P.wind_mph; $("#q_from").value = state.P.wind_from; $("#q_temp").value = state.P.temp_f; $("#q_turf").value = state.P.setting; $("#q_pin").value = state.P.pin; const pl = $("#q_pinlat"), lv = String(+state.P.pin_lat||0); if (![...pl.options].some(o => o.value === lv)) pl.add(new Option(`${Math.abs(+lv)} yd ${+lv<0?"left":"right"}`, lv)); pl.value = lv; } });
 // Today's wind and temperature from a forecast, for the course on screen: Open-Meteo's current conditions at the course's own point
 // (10-m wind, the height the rule of thumb is written for). The artifact frame refuses fetch, so the button hides there. It fills
 // the fields; Apply commits them, and the chip's title says they came from a forecast and when. Nothing about the user is sent.
@@ -1254,7 +1257,7 @@ async function useForecast(){
   b.disabled = false; b.textContent = "Use the forecast";
 }
 $("#q_forecast").addEventListener("click", useForecast);
-$("#q_apply").addEventListener("click", () => { state.P.wind_mph = +$("#q_wind").value || 0; state.P.wind_from = +$("#q_from").value || 0; state.P.temp_f = +$("#q_temp").value || 75; state.P.setting = $("#q_turf").value; state.P.pin = $("#q_pin").value; state.condNote = state.forecastNote || null; state.forecastNote = null; $("#q_fsrc").textContent = ""; $("#quick").hidden = true; $("#condChip").setAttribute("aria-expanded","false"); saveP(); toast("Conditions applied: " + windText() + ", " + state.P.temp_f + "°F, " + state.P.setting + ", pin " + state.P.pin + (state.condNote ? " — from the " + state.condNote : "")); });
+$("#q_apply").addEventListener("click", () => { state.P.wind_mph = +$("#q_wind").value || 0; state.P.wind_from = +$("#q_from").value || 0; state.P.temp_f = +$("#q_temp").value || 75; state.P.setting = $("#q_turf").value; state.P.pin = $("#q_pin").value; state.P.pin_lat = +$("#q_pinlat").value || 0; state.condNote = state.forecastNote || null; state.forecastNote = null; $("#q_fsrc").textContent = ""; $("#quick").hidden = true; $("#condChip").setAttribute("aria-expanded","false"); saveP(); toast("Conditions applied: " + windText() + ", " + state.P.temp_f + "°F, " + state.P.setting + ", " + pinText() + (state.condNote ? " — from the " + state.condNote : "")); });
 $("#courseSel").addEventListener("change", ev => { state.course = ev.target.value; store.set("course", state.course); state.hole = 1; store.set("hole", 1); state.tap = null; renderHeader(); setView(state.view); startBackground(); });
 $("#holeStrip").addEventListener("click", ev => { const b = ev.target.closest("button[data-hole]"); if (!b) return; state.hole = +b.dataset.hole; store.set("hole", state.hole); state.tap = null; state.holedOpen = false; setFixMode(false); state.markMode = false; $("#clearTap").style.display="none"; renderHeader(); if (state.view!=="hole") setView("hole"); else renderHole(); });
 $$("nav.views button").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
