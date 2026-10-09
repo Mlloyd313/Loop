@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="2b48a707de">
+<meta name="loop-build" content="3fcd71d674">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -231,6 +231,7 @@ tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
 .callbar .l2 .plan{border:0;padding:0;background:none;color:var(--plan);font-size:13px;border-radius:0}
 .callbar .l2 .cost{color:var(--engine);font-weight:600}
 .callbar .l2 .muted{color:var(--mute)}
+.callbar .l2.next{margin-top:4px;padding-top:4px;border-top:1px dashed var(--rule);color:var(--ink)}
 .callbar.quiet{border-left-color:var(--mute);cursor:default}
 .callbar.quiet .club{font-size:17px;color:var(--ink2)}
 @media (max-width:860px){.callbar{display:block}}
@@ -691,6 +692,16 @@ function roundLabel(r){ const c = course_(r.course); return `${r.date || ""} · 
 function sgClass(x){ return x == null ? "" : x > 0.05 ? "pos" : x < -0.05 ? "neg" : ""; }
 // ---------------- the caddie line (session N): the one sentence a caddie says, above the map on a phone ----------------
 function oddsShort(od, n=3){ return ODDS.filter(([k]) => od[k] >= 0.005).map(([k,c,l]) => ({ k, c, l, v: od[k] })).sort((a, b) => (a.k === "green" ? -1 : b.k === "green" ? 1 : b.v - a.v)).slice(0, n).map(o => `<span>${o.k === "green" ? "on" : o.l} ${pct(o.v)}</span>`).join(""); }
+// On the green, the next tee's call (session N): the hole after this one, priced from the course cache (computed here if it is not yet).
+function nextTeeLine(c, h){
+  const i = c.holes.findIndex(x => x.hole === h.hole); const nh = i >= 0 && i < c.holes.length - 1 ? c.holes[i + 1] : null; if (!nh || nh.nodata) return "";
+  const R = getResults(c); const r = R.holes[nh.hole] || ensureHole(c, nh); if (!r) return "";
+  let call = "";
+  if (r.kind === "tee") { const o = r.options[0]; call = `<b>${o.club}</b> ${o.best.aim === 0 ? "straight" : Math.abs(o.best.aim) + "° " + (o.best.aim < 0 ? "left" : "right")} · ${fmt(r.E)}`; }
+  else if (r.kind === "par3") { const a = r.approach; call = `<b>${a.club}</b> plays ${Math.round(a.plays)} · ${fmt(r.E)}`; }
+  else return "";
+  return `<div class="l2 next"><span>Next, hole ${nh.hole} (par ${nh.par}, ${nh.card}): ${call}</span></div>`;
+}
 function renderCallbar(c, h, r){
   const el = $("#callbar"); if (!el) return; el.hidden = false; el.className = "callbar"; let html = "", target = "#holeCard";
   const live = (() => { const a = activeRound(); return a && a.course === state.course ? a : null; })();
@@ -699,7 +710,7 @@ function renderCallbar(c, h, r){
   else if (state.tap && state.tap.res) { const t = state.tap, a = t.res; el.className = "callbar mark"; target = "#fromHere";
     const from = t.label === "mark" ? "your ball" : t.label && t.label.startsWith("GPS") ? "where you stand" : "the tap";
     if (a.fromLie === LIE.GREEN) { const ft = Math.round(a.from * 3); const ex = E.baseAt(E.lut(state.P.baseline, "green_ft"), ft);
-      html = `<div class="l1"><span class="club">${ft} ft putt</span><span class="aim">from ${from}</span><span class="E">${fmt(ex)}<small>putts expected</small></span></div><div class="l2"><span class="muted">the green curve; no slope is modelled</span></div>`; }
+      html = `<div class="l1"><span class="club">${ft} ft putt</span><span class="aim">from ${from}</span><span class="E">${fmt(ex)}<small>putts expected</small></span></div><div class="l2"><span class="muted">the green curve; no slope is modelled</span></div>${nextTeeLine(c, h)}`; }
     else if (!a.best) html = `<div class="l1"><span class="club">No shot</span><span class="aim">from ${from}: ${Math.round(a.from)} yd${a.shortBy > 2 ? `, ${Math.round(a.shortBy)} yd short even with the longest club` : ""}</span></div>`;
     else { const gl = t.gl; html = `<div class="l1"><span class="club">${a.club}</span><span class="aim">${Math.round(a.from)}, plays ${Math.round(a.plays)}</span><span class="E">${fmt(a.best.E)}<small>to hole out</small></span></div>
         <div class="l2"><span class="muted">from ${from}</span>${a.fromPen >= 1 ? `<span class="cost">a stroke and a drop first</span>` : ""}${oddsShort(a.best.odds)}${gl && gl.delta != null && gl.go.best ? `<span class="${gl.delta > 0 ? "cost" : ""}">${gl.delta > 0 ? "go — saves " + fmt(gl.delta) : "lay up to " + (gl.lay ? gl.lay.leave : "–") + " — saves " + fmt(-gl.delta)}</span>` : ""}</div>`; } }
