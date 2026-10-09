@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="9942ed40d3">
+<meta name="loop-build" content="2b48a707de">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -121,6 +121,19 @@ tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--engine)}
 .src{font-size:12.5px;color:var(--mute);margin-top:18px;line-height:1.5}
 .profile{width:100%;height:110px;display:block;margin:4px 0 0}
 .round table td,.round table th{padding:7px 8px}
+/* The pocket card on a phone (session N): the Course view's rows as cards at ≤ 560 px; the eleven-column table elsewhere */
+.round .cards{display:none}
+.round .hc{padding:8px 0;border-top:1px solid var(--rule)}
+.round .hc .l1{display:flex;align-items:center;gap:8px}
+.round .hc .hn{font-family:var(--num);font-weight:700;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--paper);display:inline-flex;align-items:center;justify-content:center;font-size:13px;text-decoration:none;flex:none}
+.round .hc .meta{color:var(--mute);font-size:12.5px}
+.round .hc .E{margin-left:auto;font-family:var(--num);font-weight:700;font-size:18px}
+.round .hc input.score{width:44px;text-align:right;padding:3px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);font-family:var(--num)}
+.round .hc .l2{font-size:14px;margin-top:3px}
+.round .hc .l3{font-size:12.5px;color:var(--ink2);margin-top:2px}
+.round .hc .muted{color:var(--mute)}
+.round .hc.tot{border-top:2px solid var(--ink)}
+@media (max-width:560px){.round .tablewrap{display:none}.round .cards{display:block}#viewRound{display:flex;flex-direction:column}#viewRound>h1{order:-3}#viewRound>.cards{order:-2}#viewRound>.progress{font-size:12px}}
 .round .tot{font-family:var(--num);font-size:18px;font-weight:700}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:12px 0 18px}
 .kpi{padding:12px 14px;background:var(--panel);border-radius:10px}
@@ -929,9 +942,11 @@ function renderRound(){
     <div class="kpi"><div class="v num">${rows.filter(x=>x.r&&x.r.goLay&&x.r.goLay.delta>0.1).length}</div><div class="l">par 5s where going for the green beats laying up by more than 0.1</div></div></div>`;
   html += IN_ARTIFACT ? `<div class="noprint" style="margin:0 0 10px;font-size:12.5px;color:var(--mute)">The pocket card (one printable page per course) prints from the copy in Documents\\Claude\\The Forge\\Loop.</div>` : `<div class="noprint" style="margin:0 0 10px"><button id="printPocket">Print the pocket card</button> <span style="font-size:12.5px;color:var(--mute)">one page: club, line, plays-like and the call for every hole</span></div>`;
   const rr = roundForCourse(c, false); const scoreOf = h => rr && rr.holes && rr.holes[h.hole] && rr.holes[h.hole].score != null ? rr.holes[h.hole].score : "";
+  let cards = `<div class="cards">`;   // the pocket card on a phone (session N): one row per hole, the same numbers as the table, no sideways scroll
   html += `<div class="tablewrap"><table><thead><tr><th class="n">Hole</th><th class="n">Par</th><th class="n">Yards</th><th>Tee shot</th><th class="n">Expected</th><th>Plan's club</th><th class="n">Costs</th><th class="n">Leaves · plays</th><th>Approach</th><th>Second shot</th><th class="n" title="${rr ? esc(roundLabel(rr)) : "typing a score starts a scores-only round for today"}">Your score${rr ? `<br><span style="font-weight:400">${esc(rr.date||"")}</span>` : ""}</th></tr></thead><tbody>`;
   for (const {h,r} of rows) {
     const sc = scoreOf(h);
+    if (!r) cards += `<div class="hc"><div class="l1"><a href="#" data-gohole="${h.hole}" class="hn">${h.hole}</a><span class="meta">par ${h.par} · ${h.card}</span><span class="muted">${h.nodata?"no measured line":"pricing…"}</span><input class="score" data-hole="${h.hole}" value="${sc}" inputmode="numeric" aria-label="Score, hole ${h.hole}"></div></div>`;
     if (!r) { html += `<tr><td class="n">${h.hole}</td><td class="n">${h.par}</td><td class="n">${h.card}</td><td colspan="7" style="color:var(--mute)">${h.nodata?"no measured line":"…"}</td><td class="n"><input class="score" data-hole="${h.hole}" value="${sc}" style="width:44px;text-align:right;padding:2px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)" inputmode="numeric"></td></tr>`; continue; }
     let tee="", app="", sec="", plan="", cost="", leaves="";
     if (r.kind==="tee") { const o=r.options[0], b=o.best; tee=`<b>${o.club}</b> ${aimShort(b.aim)}`; leaves=`${Math.round(b.rem)} · ${Math.round(b.plays)}`; const pc=planClubFor(c,h); plan = pc?`<span style="color:var(--plan)">${pc}</span>`:"–"; cost = r.planE!=null && pc!==o.club ? `<span style="color:var(--engine)">${sgn(r.planE-r.E)}</span>` : (pc?"agrees":"–");
@@ -940,11 +955,15 @@ function renderRound(){
       else if (r.goLay&&r.goLay.lay) sec = `out of reach · lay up to ${r.goLay.lay.leave}`; }
     else if (r.kind==="par3") { const a=r.approach; tee=`<b>${a.club}</b>`; leaves=`plays ${Math.round(a.plays)}`; app = a.best && !r.curveOnly ?`on ${pct(a.best.odds.green)}`:"curve only"; }
     else tee = `<span style="color:var(--mute)">not priced</span>`;
+    cards += `<div class="hc"><div class="l1"><a href="#" data-gohole="${h.hole}" class="hn">${h.hole}</a><span class="meta">par ${h.par} · ${h.card}</span><span class="E num">${r.E!=null?fmt(r.E):"–"}</span><input class="score" data-hole="${h.hole}" value="${sc}" inputmode="numeric" aria-label="Score, hole ${h.hole}"></div>
+      <div class="l2">${tee}${leaves?` · ${r.kind==="par3"?leaves:"leaves "+leaves.replace(" · ", ", plays ")}`:""}${app?` → ${app}`:""}</div>${(plan && plan!=="–") || sec ? `<div class="l3">${plan && plan!=="–" ? `plan ${plan}${cost?` ${cost}`:` <span class="muted">agrees</span>`}` : ""}${sec ? `${plan && plan!=="–" ? " · " : ""}second shot: ${sec}` : ""}</div>` : ""}</div>`;
     html += `<tr><td class="n"><a href="#" data-gohole="${h.hole}" style="font-weight:600">${h.hole}</a></td><td class="n">${h.par}</td><td class="n">${h.card}</td><td>${tee}</td><td class="n"><b>${fmt(r.E)}</b></td><td>${plan}</td><td class="n">${cost}</td><td class="n">${leaves}</td><td>${app}</td><td>${sec}</td><td class="n"><input class="score" data-hole="${h.hole}" value="${sc}" style="width:44px;text-align:right;padding:2px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)" inputmode="numeric"></td></tr>`;
   }
   const scored = rows.filter(x=>x.r&&x.r.E!=null&&+scoreOf(x.h)>0);
   const vsModel = scored.reduce((s,x)=>s+(+scoreOf(x.h)-x.r.E),0);
   html += `</tbody><tfoot><tr><td class="tot" colspan="4">Totals</td><td class="n tot">${nE?fmt(engE,1):"–"}</td><td></td><td class="n tot" style="color:var(--engine)">${nPlan?sgn(planE,1):""}</td><td colspan="3" style="color:var(--mute);font-size:12.5px">${scored.length?`Your ${scored.length} scores run ${sgn(vsModel,1)} against the model on those holes. The <a href="#" data-goview="rounds">Rounds</a> view prices every marked shot.`:"Scores typed here go into a scores-only round. To learn where the strokes went, start a round on the Hole page and mark the ball before each shot."}</td><td class="n tot">${scored.length?scored.reduce((s,x)=>s+ +scoreOf(x.h),0):""}</td></tr></tfoot></table></div>`;
+  cards += `<div class="hc tot"><div class="l1"><span class="hn" style="background:none;color:var(--ink)">Σ</span><span class="meta">model strokes, ${nE} holes</span><span class="E num">${nE?fmt(engE,1):"–"}</span><span class="E num" style="color:var(--engine);font-size:15px">${nPlan?"plan "+sgn(planE,1):""}</span></div></div></div>`;
+  html += cards;
   html += `<p class="src">Model strokes use the ${state.P.baseline} strokes-to-hole-out curve after the simulated shots; they compare strategies and will not match your scoring average. Holes without mapped fairways are left out of the totals.</p>`;
   el.innerHTML = html;
   $$("[data-gohole]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); state.hole = +a.dataset.gohole; store.set("hole", state.hole); setView("hole"); }));
