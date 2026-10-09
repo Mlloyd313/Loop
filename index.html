@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="c23ca14599">
+<meta name="loop-build" content="6ff5bf07de">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -280,7 +280,7 @@ details.more>summary::marker{color:var(--mute)}
         <div class="maptop">
           <div class="maphint" id="mapHint">Tap the map: from here?</div>
           <div class="playtools" id="playtools" hidden></div>
-          <div class="maptools"><button id="gpsBtn" title="Price the shot from where you are standing (uses your device's location)">Where I stand</button><button id="togglePrice" title="Every square yard priced: strokes to hole out from there, on your surfaces and elevation">Price map</button><button id="toggleSurf" title="Show the mapped surfaces the engine prices">Surfaces</button><button id="fixGreen" title="The hole plays to a different green than the map thinks: tap it">Fix green</button><button id="clearTap" style="display:none">Clear</button></div>
+          <div class="maptools"><button id="gpsBtn" title="Price the shot from where you are standing (uses your device's location)">Where I stand</button><button id="followBtn" title="Follow me: the page keeps your position, switches to the hole you are on and prices the shot from where you stand — no taps (uses your device's location while this page is open)">Follow</button><button id="togglePrice" title="Every square yard priced: strokes to hole out from there, on your surfaces and elevation">Price map</button><button id="toggleSurf" title="Show the mapped surfaces the engine prices">Surfaces</button><button id="fixGreen" title="The hole plays to a different green than the map thinks: tap it">Fix green</button><button id="clearTap" style="display:none">Clear</button></div>
         </div>
       </div>
       <div id="attrib" class="maplegend" style="padding-top:4px;padding-bottom:0" hidden><span style="--c:transparent">Imagery © Esri, Maxar, Earthstar Geographics and the GIS user community · map data © OpenStreetMap contributors</span></div>
@@ -538,6 +538,17 @@ function priceFrom(x, y, label){ const h = hole(); const res = E.approach(h, [x,
 function worldOf(c, lat, lon){ const [lat0, lon0] = c.origin; return [(lon - lon0) * Math.cos(lat0*Math.PI/180) * 111320, (lat - lat0) * 110574]; }
 function frameOf(h, wx, wy){ const f = h.frame; const dx = wx - f.origin[0], dy = wy - f.origin[1]; return [dx*f.u[0] + dy*f.u[1], dx*f.v[0] + dy*f.v[1]]; }
 function onHole(h, x, y, slack = 60){ const f = h.frame; return x >= f.x0 - slack && x <= f.x1 + slack && Math.abs(y) <= f.w + slack; }
+// The hole you are on (session N): the current hole while you stand within 25 m of its line, else the hole whose line is nearest by a
+// 15-m margin — frames overlap where a tee sits beside the last green, so "inside the frame" alone kept the 2nd tee on the 1st hole.
+function lineDist(h, x, y){ const L = h.line || []; let best = 1e9; for (let i = 0; i < L.length - 1; i++) { const [ax, ay] = L[i], [bx, by] = L[i + 1]; const dx = bx - ax, dy = by - ay; const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / ((dx * dx + dy * dy) || 1))); best = Math.min(best, Math.hypot(x - (ax + t * dx), y - (ay + t * dy))); } return best; }
+function holeAt(c, wx, wy, cur){
+  const dist = hh => { const [x, y] = frameOf(hh, wx, wy); return onHole(hh, x, y, 60) ? lineDist(hh, x, y) : 1e9; };
+  let best = null, bestD = 1e9; for (const hh of c.holes) { if (!hh.frame || !hh.line) continue; const d = dist(hh); if (d < bestD) { bestD = d; best = hh; } }
+  const curD = cur && cur.frame ? dist(cur) : 1e9;
+  if (cur && curD <= 25) return { hole: cur, d: curD, switched: false };
+  if (best && bestD + 15 < curD) return { hole: best, d: bestD, switched: best !== cur };
+  return { hole: cur, d: curD, switched: false };
+}
 function nearestHole(c, wx, wy){ let bestH = null, bestD = 1e9; for (const hh of c.holes) { if (!hh.frame) continue; const [xx, yy] = frameOf(hh, wx, wy); const g = hh.frame; const d = Math.max(0, g.x0 - xx, xx - g.x1) + Math.max(0, Math.abs(yy) - g.w); if (d < bestD) { bestD = d; bestH = hh; } } return { hole: bestH, d: bestD }; }
 // Resolve the device's position to a hole and frame point; cb(err | null, { h, x, y, acc, switched })
 function locate(cb, maxAge){
@@ -545,9 +556,9 @@ function locate(cb, maxAge){
   navigator.geolocation.getCurrentPosition(pos => {
     const c = course(); let h = hole(); if (!h.frame) { cb("This hole has no map."); return; }
     const [wx, wy] = worldOf(c, pos.coords.latitude, pos.coords.longitude); let [x, y] = frameOf(h, wx, wy); let switched = false;
-    if (!onHole(h, x, y)) { const nh = nearestHole(c, wx, wy);
-      if (nh.hole && nh.d < 150 && nh.hole.hole !== h.hole) { h = nh.hole; [x, y] = frameOf(h, wx, wy); switched = true; }
-      else { cb("Your position is " + Math.round(Math.hypot(x, y)/YD) + " yards from this hole's tee — not on " + c.name + " as mapped. Pick the course you are on."); return; } }
+    const at = holeAt(c, wx, wy, h);
+    if (at.d >= 1e9) { cb("Your position is " + Math.round(Math.hypot(x, y)/YD) + " yards from this hole's tee — not on " + c.name + " as mapped. Pick the course you are on."); return; }
+    if (at.switched) { h = at.hole; [x, y] = frameOf(h, wx, wy); switched = true; }
     cb(null, { h, x, y, acc: pos.coords.accuracy, switched });
   }, err => cb(err.code === 1 ? "Location permission was refused." : "Could not get a position (" + err.message + ")."), { enableHighAccuracy: true, timeout: 12000, maximumAge: maxAge == null ? 5000 : maxAge });
 }
@@ -558,6 +569,37 @@ function locateMe(){
     priceFrom(p.x, p.y, "GPS ±" + Math.round(p.acc) + " m"); });
 }
 $("#gpsBtn").addEventListener("click", locateMe);
+// ---- Follow me (session N): the phone build and the local file keep the position; the caddie line is always the shot from where you stand ----
+// Each fix: ignored beyond 30 m accuracy; off this hole → the hole you are on (within 150 m of its frame); on the tee → the tee call; else the
+// shot from here, re-priced once you have moved 8 m (or the hole changed). Paused while the page is hidden; the setting is kept per browser.
+const follow = { watch: null, last: null, lastHole: null, acc: null, note: null, manualUntil: 0 };   // manualUntil: a hole you chose by hand is kept for 90 s before Follow switches back
+function followNote(t){ follow.note = t; const cb = $("#callbar"); if (cb && t && !cb.hidden && !cb.classList.contains("quiet")) { let el = cb.querySelector(".fw"); if (!el) { el = document.createElement("span"); el.className = "muted fw"; const l2 = cb.querySelector(".l2"); if (l2) l2.appendChild(el); } el.textContent = t; } }
+function onFollowFix(pos){
+  const acc = pos.coords.accuracy; follow.acc = acc; const c = course(); let h = hole(); if (!h.frame) return;
+  if (acc > 30) { followNote(`GPS ±${Math.round(acc)} m — waiting for a better fix`); return; }
+  const [wx, wy] = worldOf(c, pos.coords.latitude, pos.coords.longitude); let [x, y] = frameOf(h, wx, wy);
+  const at = holeAt(c, wx, wy, h);
+  if (at.d >= 1e9) { const nh = nearestHole(c, wx, wy); followNote(`not on ${c.name} as mapped (${Math.round(nh.d)} m off)`); return; }
+  if (at.switched) {
+    if (Date.now() < follow.manualUntil) { followNote("you chose this hole; Follow returns to yours in a moment"); return; }
+    h = at.hole; [x, y] = frameOf(h, wx, wy); state.hole = h.hole; store.set("hole", state.hole); state.tap = null; state.holedOpen = false; follow.last = null; renderHeader(); renderHole(); window.scrollTo({ top: 0 }); toast("You are on hole " + h.hole + "."); }
+  const onTee = Math.hypot(x, y) <= 30;   // standing on the tee: the hole's own call is the shot
+  const moved = !follow.last || follow.lastHole !== h.hole || Math.hypot(x - follow.last[0], y - follow.last[1]) >= 8;
+  if (!moved) return; follow.last = [x, y]; follow.lastHole = h.hole;
+  if (onTee) { if (state.tap) { state.tap = null; renderHole(); } followNote(`on the tee · GPS ±${Math.round(acc)} m`); return; }
+  priceFrom(x, y, "GPS ±" + Math.round(acc) + " m"); followNote(`following · GPS ±${Math.round(acc)} m`);
+}
+function setFollow(on, quiet){
+  if (on && !(navigator.geolocation && !IN_ARTIFACT)) { toast("This copy has no location service; use the phone build or the local file."); return; }
+  if (follow.watch != null) { navigator.geolocation.clearWatch(follow.watch); follow.watch = null; }
+  state.follow = !!on; store.set("follow", state.follow); const b = $("#followBtn"); if (b) { b.textContent = on ? "Following" : "Follow"; b.style.fontWeight = on ? "700" : "400"; b.setAttribute("aria-pressed", String(!!on)); }
+  if (!on) { follow.last = null; if (!quiet) toast("Follow off."); const fw = document.querySelector("#callbar .fw"); if (fw) fw.remove(); return; }
+  follow.last = null;
+  follow.watch = navigator.geolocation.watchPosition(onFollowFix, err => { toast(err.code === 1 ? "Location permission was refused; Follow is off." : "Could not get a position (" + err.message + ")."); if (err.code === 1) setFollow(false, true); }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 2000 });
+  if (!quiet) toast("Following you: the line above the map is the shot from where you stand, on the hole you are on.");
+}
+$("#followBtn").addEventListener("click", () => setFollow(!state.follow));
+document.addEventListener("visibilitychange", () => { if (!state.follow) return; if (document.hidden) { if (follow.watch != null) { navigator.geolocation.clearWatch(follow.watch); follow.watch = null; } } else if (follow.watch == null) setFollow(true, true); });
 $("#toggleSurf").addEventListener("click", () => { state.showSurf = !state.showSurf; $("#toggleSurf").style.fontWeight = state.showSurf? "700":"400"; if (!hole().nodata) drawMap(hole(), getResults(course()).holes[state.hole]); });
 // ---------------- rounds: the ledger ----------------
 // A round = one course, one date, a settings snapshot, and per hole the positions the ball was played from (shot 1 is always the tee),
@@ -660,6 +702,7 @@ function renderCallbar(c, h, r){
   else if (r && r.kind === "gated") { el.className = "callbar quiet"; html = `<div class="l1"><span class="club">Tee shot not priced</span></div><div class="l2"><span class="muted">no fairway mapped and the imagery is not green enough to read one</span></div>`; }
   else { el.hidden = true; return; }
   el.innerHTML = html; el.dataset.target = target;
+  if (state.follow && follow.note && !el.classList.contains("quiet")) followNote(follow.note);
   if (!el._bound) { el._bound = true; const go = () => { if (el.classList.contains("quiet")) return; const t = $(el.dataset.target) || $("#holeCard"); if (!t) return; const top = t.getBoundingClientRect().top + window.scrollY - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--hdr")) || 0) - 8; window.scrollTo({ top, behavior: "smooth" }); };
     el.addEventListener("click", go); el.addEventListener("keydown", ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); go(); } }); }
 }
@@ -1344,11 +1387,12 @@ async function useForecast(){
 $("#q_forecast").addEventListener("click", useForecast);
 $("#q_apply").addEventListener("click", () => { state.P.wind_mph = +$("#q_wind").value || 0; state.P.wind_from = +$("#q_from").value || 0; state.P.temp_f = +$("#q_temp").value || 75; state.P.setting = $("#q_turf").value; state.P.pin = $("#q_pin").value; state.P.pin_lat = +$("#q_pinlat").value || 0; state.condNote = state.forecastNote || null; state.forecastNote = null; $("#q_fsrc").textContent = ""; $("#quick").hidden = true; $("#condChip").setAttribute("aria-expanded","false"); saveP(); toast("Conditions applied: " + windText() + ", " + state.P.temp_f + "°F, " + state.P.setting + ", " + pinText() + (state.condNote ? " — from the " + state.condNote : "")); });
 $("#courseSel").addEventListener("change", ev => { state.course = ev.target.value; store.set("course", state.course); state.hole = 1; store.set("hole", 1); state.tap = null; renderHeader(); setView(state.view); startBackground(); });
-$("#holeStrip").addEventListener("click", ev => { const b = ev.target.closest("button[data-hole]"); if (!b) return; state.hole = +b.dataset.hole; store.set("hole", state.hole); state.tap = null; state.holedOpen = false; setFixMode(false); state.markMode = false; $("#clearTap").style.display="none"; renderHeader(); if (state.view!=="hole") setView("hole"); else renderHole(); });
+$("#holeStrip").addEventListener("click", ev => { const b = ev.target.closest("button[data-hole]"); if (!b) return; if (state.follow) follow.manualUntil = Date.now() + 90000; state.hole = +b.dataset.hole; store.set("hole", state.hole); state.tap = null; state.holedOpen = false; setFixMode(false); state.markMode = false; $("#clearTap").style.display="none"; renderHeader(); if (state.view!=="hole") setView("hole"); else renderHole(); });
 $$("nav.views button").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
 document.addEventListener("keydown", ev => { if (ev.target.matches("input,select,textarea")) return; if (ev.key==="ArrowRight"||ev.key==="ArrowLeft") { const c=course(); const i = c.holes.findIndex(h=>h.hole===state.hole); const j = Math.max(0, Math.min(c.holes.length-1, i + (ev.key==="ArrowRight"?1:-1))); state.hole = c.holes[j].hole; store.set("hole", state.hole); state.tap=null; renderHeader(); if (state.view==="hole") renderHole(); } });
 // boot
-if (IN_ARTIFACT || !navigator.geolocation) { $("#gpsBtn").style.display = "none"; }
+if (IN_ARTIFACT || !navigator.geolocation) { $("#gpsBtn").style.display = "none"; $("#followBtn").style.display = "none"; }
+else if (store.get("follow", false)) setTimeout(() => setFollow(true, true), 800);   // the phone was following when it was last closed
 if (IN_ARTIFACT || typeof fetch !== "function") { $("#q_forecast").style.display = "none"; }   // the artifact frame refuses fetch
 renderHeader(); setView("hole"); startBackground();
 })();
