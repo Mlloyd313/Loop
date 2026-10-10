@@ -1,7 +1,7 @@
 // Loop service worker: app shell cached on install, Esri tiles cached as they are seen (so a hole viewed once works offline).
-// SHELL is a hash of the page, the engine and the data: any rebuild changes this file, the browser installs the new worker, it caches the new
+// SHELL is a hash of the page, the engine, the data and this worker: any rebuild changes this file, the browser installs the new worker, it caches the new
 // shell, drops the old one, takes over the open pages and reloads them (an update, never a first install, has old shell caches to drop).
-const SHELL = "loop-shell-4b24aa7ef3"; const TILES = "loop-tiles-v1";
+const SHELL = "loop-shell-41c89fbe0b"; const TILES = "loop-tiles-v1";
 const SHELL_FILES = ["./", "./index.html", "./engine.js", "./ledger.js", "./swing.js", "./data.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil((async () => {
@@ -21,6 +21,7 @@ self.addEventListener("fetch", e => {
     return;
   }
   if (url.origin === location.origin) {
-    e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request).then(r => { if (r.ok && e.request.method === "GET") caches.open(SHELL).then(c => c.put(e.request, r.clone())); return r; })));
+    const nav = e.request.mode === "navigate";   // the page by any address: a shared link's ?x still opens the cached page with no signal (session Q)
+    e.respondWith(caches.match(e.request, { ignoreSearch: nav }).then(hit => hit || fetch(e.request).then(r => { if (r.ok && e.request.method === "GET") caches.open(SHELL).then(c => c.put(e.request, r.clone())); return r; })));
   }
 });
