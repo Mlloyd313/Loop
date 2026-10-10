@@ -64,6 +64,8 @@
     const dl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
     const H = { lie, z, nx: g.nx, ny: g.ny, cell: g.cell, enx: e.nx, eny: e.ny, ecell: e.cell, x0: h.frame.x0, w: h.frame.w, basePin, pin: basePin.slice(), dir: [(b[0] - a[0]) / dl, (b[1] - a[1]) / dl], pinFt, teeFt: h.tee_ft, depth, overridden, cardPA: h.desert_rule === "penalty_area", desertPA: h.desert_rule === "penalty_area" };   // the club's card's desert rule (session P); desertPA as priced (applyPin)
     if (overridden) { H.pinFt = zAt(H, basePin[0], basePin[1]); H.basePinFt = H.pinFt; }
+    H.ownLine = overridden ? (ln.length > 2 ? ln.slice(0, -1).concat([basePin.slice()]) : [ln[0], basePin.slice()]) : ln;   // this hole's line, its green as moved (R-E1)
+    H.others = (h.others || []).map(o => o.l); H.otherHoles = (h.others || []).map(o => o.h);   // the other holes' lines on the course, in this hole's frame, and their numbers (build_data.py; session R, R-E1)
     return h._dec = H;
   }
   // pin position: front / middle / back = a third of the green's depth along the last segment of the hole line; pin_lat = yards beside
@@ -122,6 +124,28 @@
     const z = H.z, i = iy * H.enx + ix;
     return z[i] * (1 - tx) * (1 - ty) + z[i + 1] * tx * (1 - ty) + z[i + H.enx] * (1 - tx) * ty + z[i + H.enx + 1] * tx * ty;
   }
+
+  // ---------- another hole's ground (session R, R-E1) ----------
+  // A cell is another hole's ground when another hole's line on the course (h.others, in this frame) is nearer to it than this hole's own
+  // line: the course's routing split between its holes. The tee pick keeps to aims that finish mostly on the hole's own ground (P.own_ground);
+  // nothing is priced differently — a ball that ends on another hole's fairway is a fairway lie. Mirrors engine.py Hole.foreign / foreign_share.
+  function segDist(x, y, a, b) { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy; let t = L2 > 0 ? ((x - a[0]) * dx + (y - a[1]) * dy) / L2 : 0; if (t < 0) t = 0; if (t > 1) t = 1;
+    return Math.hypot(x - (a[0] + t * dx), y - (a[1] + t * dy)); }
+  function lineDist(x, y, ln) { let d = Infinity; for (let i = 0; i + 1 < ln.length; i++) { const e = segDist(x, y, ln[i], ln[i + 1]); if (e < d) d = e; } return d; }
+  function foreignMask(H) {
+    if (H.foreign !== undefined) return H.foreign;
+    if (!H.others || !H.others.length) return H.foreign = null;
+    const m = new Uint8Array(H.nx * H.ny);
+    for (let iy = 0; iy < H.ny; iy++) { const y = -H.w + (iy + 0.5) * H.cell;
+      for (let ix = 0; ix < H.nx; ix++) { const x = H.x0 + (ix + 0.5) * H.cell; const d0 = lineDist(x, y, H.ownLine);
+        for (const o of H.others) if (lineDist(x, y, o) < d0) { m[iy * H.nx + ix] = 1; break; } } }
+    return H.foreign = m;
+  }
+  function foreignAt(H, x, y) { const m = foreignMask(H); if (!m) return 0; const ix = Math.floor((x - H.x0) / H.cell), iy = Math.floor((y + H.w) / H.cell);
+    return ix < 0 || iy < 0 || ix >= H.nx || iy >= H.ny ? 0 : m[iy * H.nx + ix]; }
+  function groundOf(H, x, y) {   // the hole whose ground a point is on: this hole (0) or another hole's number
+    let d0 = lineDist(x, y, H.ownLine), k = 0; for (let i = 0; i < H.others.length; i++) { const d = lineDist(x, y, H.others[i]); if (d < d0) { d0 = d; k = H.otherHoles[i]; } } return k; }
+  function foreignShare(H, px, py, n) { const m = foreignMask(H); if (!m) return 0; let k = 0; for (let i = 0; i < n; i++) k += foreignAt(H, px[i], py[i]); return k / n; }
 
   // ---------- clubs ----------
   // The club table in play: the chosen player's (P.clubs: Tour, 10 or 20 handicap, or a golfer's own) or the build's default, the public
@@ -245,18 +269,27 @@
     // scan around the fairway's own direction (first segment of the hole line), not the tee→pin line: doglegs need it
     const seg = h.line.length > 2 ? h.line[1] : H.basePin; let aim0 = Math.round(Math.atan2(seg[1], seg[0]) * 180 / Math.PI / P.aim_step) * P.aim_step; if (Math.abs(aim0) < P.aim_step) aim0 = 0;
     for (const name of clubs) {
-      const club = clubParams(name, P, altf); const curve = []; let best = null;
+      const club = clubParams(name, P, altf); const curve = []; let best = null, free = null; const own = !!P.own_ground && !!foreignMask(H);
       const aims = opts && opts.aims ? opts.aims : null;   // simulation tooling: play given aims only (the model is unchanged)
       for (let aim = aims ? aims[0] : aim0 + P.aim_min, ai = 0; aims ? ai < aims.length : aim <= aim0 + P.aim_max; aims ? (aim = aims[++ai]) : (aim += P.aim_step)) {
         const rand = mulberry32(P.seed * 1000 + 7); // common random numbers across aims and clubs
         shoot(H, [0, 0], aim, club, n, rand, P, bearing, buf);
-        const r = price(H, buf.px, buf.py, n, P, base, 0); r.aim = aim; curve.push(r);
-        if (!best || r.E < best.E) best = r;
+        const r = price(H, buf.px, buf.py, n, P, base, 0); r.aim = aim;
+        if (own) { r.foreign = foreignShare(H, buf.px, buf.py, n); r.admissible = r.foreign <= 0.5;   // R-E1: mostly on another hole's ground?
+          if (!r.admissible) { const cnt = {}; for (let i = 0; i < n; i += 10) { const g = groundOf(H, buf.px[i], buf.py[i]); if (g) cnt[g] = (cnt[g] || 0) + 1; }   // whose (display only; not in engine.py)
+            let top = 0, k = 0; for (const g in cnt) if (cnt[g] > top) { top = cnt[g]; k = +g; } r.whose = k; } }
+        curve.push(r);
+        if (!own || r.admissible) { if (!best || r.E < best.E) best = r; }
+        if (!free || r.E < free.E) free = r;
       }
+      const fallback = !best; if (fallback) best = free;   // no aim of this club finishes on its own hole: its unrestricted best, flagged
       // keep the landing sample of the best aim
       const rand = mulberry32(P.seed * 1000 + 7); shoot(H, [0, 0], best.aim, club, n, rand, P, bearing, buf); best = Object.assign(price(H, buf.px, buf.py, n, P, base, keep), { aim: best.aim });
-      const win = curve.filter(c => c.E <= best.E + 0.05).map(c => c.aim);
-      out.push({ club: name, carry: club.carry, total: club.carry + club.roll, best, curve, window: [Math.min(...win), Math.max(...win)], straight: curve.find(c => c.aim === 0) || null, aim0 });
+      if (own) best.foreign = foreignShare(H, buf.px, buf.py, n);
+      const win = curve.filter(c => c.E <= best.E + 0.05 && (!own || fallback || c.admissible)).map(c => c.aim);
+      const o = { club: name, carry: club.carry, total: club.carry + club.roll, best, curve, window: [Math.min(...win), Math.max(...win)], straight: curve.find(c => c.aim === 0) || null, aim0 };
+      if (own) { o.ownGround = !fallback; if (free !== best && free.E < best.E - 1e-9 && !free.admissible) o.offGround = { aim: free.aim, E: free.E, foreign: free.foreign, whose: free.whose }; }   // the line it would take down another hole
+      out.push(o);
     }
     out.sort((a, b) => a.best.E - b.best.E);
     return out;
@@ -388,7 +421,7 @@
     if (h.src.fairway === "none") return { kind: "gated", E: null };
     const options = teeOptions(h, P, altf, opts);
     const pick = options[0]; const res = { kind: "tee", options, E: pick.best.E, pick: { club: pick.club, aim: pick.best.aim, window: pick.window } };
-    const planClub = (opts && opts.planClub) || h.plan.club;
+    const planClub = opts && opts.planClub;   // a club to price beside the pick when a caller asks (benches); the written plans left the build (session R)
     if (planClub) { const po = options.find(o => o.club === planClub); if (po) { res.planE = po.best.E; res.planAim = po.best.aim; } }
     const sm = pick.best.sample; if (sm && sm.length) { const xs = sm.map(s => s[0]).sort((a, b) => a - b), ys = sm.map(s => s[1]).sort((a, b) => a - b); res.landing = [xs[xs.length >> 1], ys[ys.length >> 1]]; res.approach = approach(h, res.landing, P, altf, { n: 600 }); }
     return res;
@@ -398,5 +431,5 @@
   // a player level's clubs, pattern and curve into P (mirrors engine.py apply_player); the default level leaves the build's table in place
   function applyPlayer(P, key) { const pl = D.players && D.players[key]; if (!pl) return P; Object.assign(P, JSON.parse(JSON.stringify(pl.pattern)), { baseline: pl.baseline, player: key });
     if (key === D.defaults.player) delete P.clubs; else P.clubs = JSON.parse(JSON.stringify(pl.clubs)); return P; }
-  window.LoopEngine = { setOverrides, overrideFor, pointInPoly, decodeHole, applyPin, lieAt, zAt, slopeAt, rollAfter, clubTable, applyPlayer, clubParams, clubForDistance, teeOptions, approach, goVsLay, runHole, priceAt, corridorRule, desertShares, L, YD, LIEFX, lut, baseAt, windComponents };
+  window.LoopEngine = { setOverrides, overrideFor, pointInPoly, decodeHole, applyPin, lieAt, zAt, foreignAt, foreignShare, foreignMask, groundOf, slopeAt, rollAfter, clubTable, applyPlayer, clubParams, clubForDistance, teeOptions, approach, goVsLay, runHole, priceAt, corridorRule, desertShares, L, YD, LIEFX, lut, baseAt, windComponents };
 })();

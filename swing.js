@@ -141,7 +141,7 @@
   }
   // where a session was filmed, in four words: a Loop tee box, elsewhere on a hole, near a course (range, practice area, back yard), away
   function spotKind(s) { const w = (s && s.where) || {}; if (w.hole && w.spot === "tee") return "tee"; if (w.hole) return "hole"; if (w.course) return "near"; if (w.lat != null) return "away"; return "unknown"; }
-  // one record per swing: when, who, where (course, hole, spot, the plan's club there), whether a ball was struck, the timing, and the
+  // one record per swing: when, who, where (course, hole, spot, the club hint there), whether a ball was struck, the timing, and the
   // marked shot it belongs to when a round of that moment exists — otherwise outcome "unknown". This is the association layer: Loop
   // stores what it saw together and claims nothing about cause.
   function associations(sessions, rounds) {
@@ -307,7 +307,7 @@
     // 2b. swing sessions → the hole they were filmed on (the phone's position against Loop's map): co-location, with the strike checked
     //     in the video; the shot's outcome stays unknown until a marked round of that moment links it
     for (const s of ctx.sessions || []) { const w = s.where; if (!w || !w.hole) continue;
-      const hid = node(`ctx:${w.course}:${w.hole}`, "HOLE_CONTEXT", `${w.course_name || w.course} hole ${w.hole}${w.club_hint ? ` (the plan's club: ${w.club_hint.club})` : ""}`, { course: w.course, hole: w.hole });
+      const hid = node(`ctx:${w.course}:${w.hole}`, "HOLE_CONTEXT", `${w.course_name || w.course} hole ${w.hole}${w.club_hint ? ` (a club hint: ${w.club_hint.club})` : ""}`, { course: w.course, hole: w.hole });
       const sws = s.swings.filter(x => !x.excluded); const struck = sws.filter(x => strikeOf(x).struck === true).length;
       const sid = node(`ses:${s.id}`, "SWING_OBSERVATION", `${s.date || "undated"} ${s.golfer === "me" ? "your" : s.golfer === "unknown" ? "an unlabelled" : s.golfer + "'s"} ${sws.length} swing${sws.length === 1 ? "" : "s"} (${w.spot})`, { session: s.id });
       edge(sid, hid, "filmed on", { evidence: { spot: w.spot, d_m: w.d_m == null ? null : w.d_m, struck, located: "OBSERVED position, INFERRED hole" }, n: sws.length, confidence: w.spot === "tee" ? "located (tee)" : "located", kind: "OBSERVED",

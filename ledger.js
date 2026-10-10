@@ -53,9 +53,8 @@
     if (h.nodata || !h.grid || (h.src && h.src.fairway === "none" && h.par !== 3)) { out.kind = "unpriced"; out.flags.push("the engine does not price this hole (no measured line or surfaces)"); return out; }
     const altf = 1 + P.alt_rule / 100 * (c.alt_ft - P.home_ft) / 1000;
     const H = E.decodeHole(h); E.applyPin(H, P);
-    const planClub = rec && rec.planClub !== undefined ? rec.planClub : h.plan && h.plan.club;
-    const r = E.runHole(c, h, P, { n: 800, planClub });
-    out.kind = r.kind; out.E_tee = r.E; out.planE = r.planE != null ? r.planE : null; out.planClub = planClub || null;
+    const r = E.runHole(c, h, P, { n: 800 });
+    out.kind = r.kind; out.E_tee = r.E;
     out.pick = r.kind === "tee" ? { club: r.pick.club, aim: r.pick.aim, window: r.pick.window } : { club: r.approach ? r.approach.club : null };
     if (r.E == null) { out.kind = "unpriced"; out.flags.push("no expectation for this hole"); return out; }
     const k = shots.length; const penTotal = shots.reduce((s, x) => s + (x.pen || 0), 0); out.penalties = penTotal;
@@ -320,8 +319,9 @@
     for (const h of c.holes) {
       if (h.nodata || !h.grid || (h.src.fairway === "none" && h.par !== 3)) continue;
       const H = E.decodeHole(h); E.applyPin(H, P); const shots = [{ x: 0, y: 0, src: "sim" }]; let pos = [0, 0]; let pen = 0; let holed = false; let putts = 0; let guard = 0; let teeSample = null;
-      // tee shot: the engine's pick, except every third hole where a plan club exists and differs (a decision to price)
-      if (h.par !== 3) { const r = E.runHole(c, h, P, { n: 800 }); let club = r.pick.club; if (h.plan && h.plan.club && h.plan.club !== club && h.hole % 3 === 0) club = h.plan.club; let o = r.options.find(x => x.club === club) || E.teeOptions(h, P, altf, { n: 800, keep: 120, clubs: [club] })[0];
+      // tee shot: the engine's pick, except every third hole, where the second-best club is played (a decision to price; until session R the
+      // written plan's club, which left the build on 2026-10-10)
+      if (h.par !== 3) { const r = E.runHole(c, h, P, { n: 800 }); let club = r.pick.club; if (h.hole % 3 === 0 && r.options.length > 1) club = r.options[1].club; let o = r.options.find(x => x.club === club) || E.teeOptions(h, P, altf, { n: 800, keep: 120, clubs: [club] })[0];
         if (X) o = E.teeOptions(h, X, altf, { n: 800, keep: 120, clubs: [club], aims: [o.best.aim] })[0];   // aimed with the player's normal pattern, played with the day's
         shots[0].club = club;   // the simulation knows what it hit: the club is set, as a real round's tee-off sets it (session N)
         teeSample = o.best.sample; const s = pick(o.best.sample); pos = [s[0], s[1]]; }
