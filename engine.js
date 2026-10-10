@@ -79,6 +79,42 @@
   }
   // out of bounds is stored over the cell's own lie (10–19, session P): priced as out of bounds unless the player turns it off (P.oob, set by applyPin)
   function lieAt(H, x, y) { const ix = ((x - H.x0) / H.cell) | 0, iy = ((y + H.w) / H.cell) | 0; if (ix < 0 || ix >= H.nx || iy < 0 || iy >= H.ny) return L.DESERT; const v = H.lie[iy * H.nx + ix]; return v < L.OB ? v : H.oob ? L.OB : v - L.OB; }
+  // The ground's slope at a point (dimensionless rise per run, +x along the frame, +y to its right), for the roll (session O, O-E3 R2):
+  // central differences over ± 2 cells of the elevation grid (4-yd cells, ± 8 yd), bilinear between cells (mirrors engine.py Hole.slope_at).
+  function slopeGrid(H) {
+    if (H.gx) return; const nx = H.enx, ny = H.eny, z = H.z, k = H.ecell * 3.28084; H.gx = new Float32Array(nx * ny); H.gy = new Float32Array(nx * ny);
+    for (let iy = 0; iy < ny; iy++) for (let ix = 0; ix < nx; ix++) {
+      const x1 = Math.max(0, ix - 2), x2 = Math.min(nx - 1, ix + 2), y1 = Math.max(0, iy - 2), y2 = Math.min(ny - 1, iy + 2);
+      H.gx[iy * nx + ix] = x2 > x1 ? (z[iy * nx + x2] - z[iy * nx + x1]) / ((x2 - x1) * k) : 0;
+      H.gy[iy * nx + ix] = y2 > y1 ? (z[y2 * nx + ix] - z[y1 * nx + ix]) / ((y2 - y1) * k) : 0; }
+  }
+  function slopeAt(H, x, y) {
+    slopeGrid(H);
+    let fx = (x - H.x0) / H.ecell - 0.5, fy = (y + H.w) / H.ecell - 0.5;
+    let ix = Math.floor(fx), iy = Math.floor(fy); if (ix < 0) ix = 0; if (ix > H.enx - 2) ix = H.enx - 2; if (iy < 0) iy = 0; if (iy > H.eny - 2) iy = H.eny - 2;
+    let tx = fx - ix, ty = fy - iy; if (tx < 0) tx = 0; if (tx > 1) tx = 1; if (ty < 0) ty = 0; if (ty > 1) ty = 1;
+    const i = iy * H.enx + ix, w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
+    return [H.gx[i] * w00 + H.gx[i + 1] * w10 + H.gx[i + H.enx] * w01 + H.gx[i + H.enx + 1] * w11, H.gy[i] * w00 + H.gy[i + 1] * w10 + H.gy[i + H.enx] * w01 + H.gy[i + H.enx + 1] * w11];
+  }
+  // The roll after a landing at (x, y) along (dx, dy) (right normal (nx, ny)), R metres on flat ground (session O, O-E3). Off by default:
+  // P.roll_stop (R1) — a ball that lands in or rolls into sand, a waste area, water, the desert or the trees stops there (the path checked
+  // every metre; out of bounds does not stop a ball); P.roll_mu = μ (R2) — on a short-grass landing the slope steers the roll: R·μ/(μ − sₐ)
+  // along, R·sₗ/μ across (|across| ≤ along; sₐ capped at 0.6 μ downhill). Without either, today's straight roll. Mirrors engine.py roll_after.
+  const ROLL_STOPS = new Set([L.SAND, L.WASTE, L.WATER, L.DESERT, L.SCRUB]);
+  function rollAfter(H, x, y, dx, dy, nx, ny, R, P, out) {
+    let rx = dx * R, ry = dy * R; const stop = !!P.roll_stop, mu = +P.roll_mu || 0;
+    if (stop || mu > 0) {
+      const l0 = lieAt(H, x, y);
+      if (stop && ROLL_STOPS.has(l0)) { rx = 0; ry = 0; }
+      else if (mu > 0 && (l0 === L.FAIRWAY || l0 === L.TEE || l0 === L.GREEN)) {
+        const g = slopeAt(H, x, y); const sa = -(g[0] * dx + g[1] * dy), sl = -(g[0] * nx + g[1] * ny);
+        const along = R * mu / (mu - Math.min(sa, 0.6 * mu)); let across = R * sl / mu; if (across > along) across = along; if (across < -along) across = -along;
+        rx = dx * along + nx * across; ry = dy * along + ny * across; }
+      if (stop && (rx !== 0 || ry !== 0)) { const m = Math.max(1, Math.ceil(Math.hypot(rx, ry)));
+        for (let j = 1; j <= m; j++) { const t = j / m; if (ROLL_STOPS.has(lieAt(H, x + rx * t, y + ry * t))) { rx *= t; ry *= t; break; } } }
+    }
+    out[0] = x + rx; out[1] = y + ry;
+  }
   function zAt(H, x, y) {
     let fx = (x - H.x0) / H.ecell - 0.5, fy = (y + H.w) / H.ecell - 0.5;
     let ix = Math.floor(fx), iy = Math.floor(fy); if (ix < 0) ix = 0; if (ix > H.enx - 2) ix = H.enx - 2; if (iy < 0) iy = 0; if (iy > H.eny - 2) iy = H.eny - 2;
@@ -131,7 +167,7 @@
     const k = descentK(P, club.name.replace("easy ", ""), club.carry + club.roll);
     const bias = (P.lat_bias || 0) * club.carry;   // yards, + = right: a day's (or a player's) offset of the whole pattern (Omega G)
     const z0 = zAt(H, ball[0], ball[1]);
-    const px = out.px, py = out.py;
+    const px = out.px, py = out.py; const fin = [0, 0];
     for (let i = 0; i < n; i++) {
       const good = rand() > P.q_miss; const [g1, g2] = gaussPair(rand);
       let z = g1 > 0 ? g1 * (1 + P.skew_right) : g1;
@@ -139,7 +175,7 @@
       let dist = (good ? carryW + g2 * sDist : carryW - P.miss_short_pct * club.carry + g2 * sDist * P.miss_dist_mult) * lf.carry;
       let x = ball[0] + dx * dist * YD + nx * lat * YD, y = ball[1] + dy * dist * YD + ny * lat * YD;
       for (let it = 0; it < 2; it++) { const zl = zAt(H, x, y); const tot = dist + k * (z0 - zl) / 3; x = ball[0] + dx * tot * YD + nx * lat * YD; y = ball[1] + dy * tot * YD + ny * lat * YD; if (it === 1) dist = tot; }
-      px[i] = x + dx * club.roll * YD; py[i] = y + dy * club.roll * YD;
+      rollAfter(H, x, y, dx, dy, nx, ny, club.roll * YD, P, fin); px[i] = fin[0]; py[i] = fin[1];
     }
   }
   // The three outcomes of a desert ball as shares that sum to 1: played as it lies, unplayable (a stroke and a drop), lost (stroke and distance).
@@ -362,5 +398,5 @@
   // a player level's clubs, pattern and curve into P (mirrors engine.py apply_player); the default level leaves the build's table in place
   function applyPlayer(P, key) { const pl = D.players && D.players[key]; if (!pl) return P; Object.assign(P, JSON.parse(JSON.stringify(pl.pattern)), { baseline: pl.baseline, player: key });
     if (key === D.defaults.player) delete P.clubs; else P.clubs = JSON.parse(JSON.stringify(pl.clubs)); return P; }
-  window.LoopEngine = { setOverrides, overrideFor, pointInPoly, decodeHole, applyPin, lieAt, zAt, clubTable, applyPlayer, clubParams, clubForDistance, teeOptions, approach, goVsLay, runHole, priceAt, corridorRule, desertShares, L, YD, LIEFX, lut, baseAt, windComponents };
+  window.LoopEngine = { setOverrides, overrideFor, pointInPoly, decodeHole, applyPin, lieAt, zAt, slopeAt, rollAfter, clubTable, applyPlayer, clubParams, clubForDistance, teeOptions, approach, goVsLay, runHole, priceAt, corridorRule, desertShares, L, YD, LIEFX, lut, baseAt, windComponents };
 })();
