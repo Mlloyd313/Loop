@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="2803806b56">
+<meta name="loop-build" content="1c6277751d">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1575,7 +1575,7 @@ Driver, 302, 328
     <label>Shots per option <select id="s_n"><option ${P.n==800?"selected":""}>800</option><option ${P.n==1500?"selected":""}>1500</option><option ${P.n==3000?"selected":""}>3000</option></select></label>
     <label>Aim scan ± degrees <input type="number" id="s_aim_max" min="10" max="40" step="2" value="${P.aim_max}"></label>
     <label><input type="checkbox" id="s_oob" ${P.oob?"checked":""}> Price out of bounds — a stroke and the shot again beyond the course's boundary</label>
-    <p class="help">Out of bounds is mapped from the county's parcels where they exist (house lots, roads and other property beyond the course's own land) and otherwise from OpenStreetMap's golf-course area — the line the clubs' cards describe (“perimeter fences, white stakes”). It is off until a field test supports it: priced, it made the engine rank TPC Scottsdale's holes less like the WM Phoenix Open field (ρ 0.86 → 0.83 on the tour-like pattern, at three seeds), because the model's mishits send more drives 60 yards wide than a tour player does. On, it shows on the map (Surfaces) and in every number.</p>
+    <p class="help">Out of bounds is mapped from the county's parcels where they exist (house lots, roads and other property beyond the course's own land) and otherwise from OpenStreetMap's golf-course area — the line the clubs' cards describe (“perimeter fences, white stakes”). It is on by default since 2026-10-09: with the plans' long, wide pattern it made the engine rank TPC Scottsdale's holes less like the WM Phoenix Open field (ρ 0.86 → 0.83, session P), but with the Tour level built from published dispersion it barely moved the agreement (ρ 0.86 → 0.84, the holes' fit +0.002 a hole; Raptor's NCAA field unchanged — session O's O-E1c), so the boundary is not what was wrong. It shows on the map (Surfaces) and in every number; off, each cell is priced as the ground under it.</p>
     <p class="help">Results are deterministic for a given setting (the same random draws every time), so small differences between options are real differences in the model, not noise between runs.</p>
     <p class="help"><button id="resetAll">Reset every setting</button> <span style="color:var(--mute)">Rounds and their scores are managed on the Rounds view (export, import, delete).</span></p>
   </section>`;

@@ -4,7 +4,7 @@
   const YD = 0.9144;
   const L = { DESERT: 0, FAIRWAY: 1, ROUGH: 2, GREEN: 3, SAND: 4, WATER: 5, OGREEN: 6, WASTE: 7, SCRUB: 8, TEE: 9, OB: 10 };   // OB: out of bounds (session P) — stroke and distance
   const D = window.LOOP_DATA;
-  if (D.defaults.oob == null) D.defaults.oob = false;   // out of bounds priced (session P): off by default
+  if (D.defaults.oob == null) D.defaults.oob = true;   // out of bounds priced (session P); on by default since O-E1c (data.js carries it)
   if (D.defaults.pin_lat == null) D.defaults.pin_lat = 0;   // the tucked pin (session L): data.js built before it carries the default from its next rebuild
   if (D.defaults.desert_play == null) Object.assign(D.defaults, { desert_play: 0.6, desert_unplayable: 0.25, desert_lost: 0.15, desert_drop_extra: 0.4 });   // the desert by the Rules (session L, D-L11)
   // from-lie effects on the next shot: dispersion multiplier, carry factor, penalty strokes before the shot
@@ -70,14 +70,14 @@
   // that line (+ right, − left, as seen from the fairway; 0 = on the line), the tucked pin (session L). The pin's elevation is the data's
   // at the base pin and the DEM's wherever the pin is moved (mirrors engine.py apply_pin).
   function applyPin(H, P) {
-    H.oob = !!P.oob;   // out of bounds priced (session P: a setting, off by default — P-E1b)
+    H.oob = !!P.oob;   // out of bounds priced (session P: a setting; on by default since O-E1c)
     H.desertPA = !!H.cardPA && P.desert_by !== "rules";   // the card's desert rule unless asked to price the Rules instead (the rules block's comparison)
     if (H.basePinFt == null) H.basePinFt = H.pinFt;
     const s = P.pin === "front" ? -1 : P.pin === "back" ? 1 : 0; const d = s * H.depth / 3; const lat = (+P.pin_lat || 0) * YD;
     H.pin[0] = H.basePin[0] + H.dir[0] * d - H.dir[1] * lat; H.pin[1] = H.basePin[1] + H.dir[1] * d + H.dir[0] * lat;
     H.pinFt = (d === 0 && lat === 0) ? H.basePinFt : zAt(H, H.pin[0], H.pin[1]);
   }
-  // out of bounds is stored over the cell's own lie (10–19, session P): priced as out of bounds only when the player turns it on (P.oob, set by applyPin)
+  // out of bounds is stored over the cell's own lie (10–19, session P): priced as out of bounds unless the player turns it off (P.oob, set by applyPin)
   function lieAt(H, x, y) { const ix = ((x - H.x0) / H.cell) | 0, iy = ((y + H.w) / H.cell) | 0; if (ix < 0 || ix >= H.nx || iy < 0 || iy >= H.ny) return L.DESERT; const v = H.lie[iy * H.nx + ix]; return v < L.OB ? v : H.oob ? L.OB : v - L.OB; }
   function zAt(H, x, y) {
     let fx = (x - H.x0) / H.ecell - 0.5, fy = (y + H.w) / H.ecell - 0.5;
