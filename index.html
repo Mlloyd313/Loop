@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="539a73cc8b">
+<meta name="loop-build" content="e1b9ffe88e">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -487,9 +487,9 @@ function pct(x){ return x==null ? "–" : Math.round(x*100)+"%"; }
 function sgn(x, d=2){ return x==null ? "–" : (x>0?"+":"")+(+x).toFixed(d); }
 // ---------------- the aim window at the landing distance (session O, slice 4) ----------------
 // The engine's window — every aim within 0.05 of the best, from the curve it already scanned over the hole's ground — drawn where a golfer
-// looks: across the hole at the pick's median landing distance, in yards off the pin line, with the fairway's width there and the ground
-// under each edge read from the same lie grid. Nothing new is simulated; the aims are scanned P.aim_step (2°) apart, so an edge is good to
-// a step. aimYd is where an aim line reaches a distance from the tee (yards right + / left −): the ball's own offset, sin (it was tan,
+// looks: across the hole at the pick's median landing distance, its edges in yards off the pin line and its width across the shot (along
+// the arc at that distance), with the fairway's width there and the ground under each edge read from the same lie grid. Nothing new is
+// simulated; the aims are scanned P.aim_step (2°) apart, so an edge is good to a step. aimYd is where an aim line reaches a distance from the tee (yards right + / left −): the ball's own offset, sin (it was tan,
 // which measured the line further out than the ball goes — the same to a yard below 10°, 14 yd less on Augusta 13's 26°).
 function aimYd(a, atYd){ return Math.sin(a * Math.PI / 180) * atYd; }
 function sideYd(v, short){ const n = Math.round(Math.abs(v)); return n === 0 ? (short ? "0" : "on the pin line") : short ? n + (v < 0 ? " L" : " R") : n + " yd " + (v < 0 ? "left" : "right"); }
@@ -504,9 +504,10 @@ function landingWindow(c, h, r){
   for (let a = aL - span; a <= aL + span; a += st) { if (lie(a) === E.L.FAIRWAY) { if (cur) cur[1] = a; else cur = [a, a]; } else if (cur) { runs.push(cur); cur = null; } }
   if (cur) runs.push(cur);
   const gap = q => (aL < q[0] ? q[0] - aL : aL > q[1] ? aL - q[1] : 0) * Math.PI / 180 * d; runs.sort((p, q) => gap(p) - gap(q));
-  const fw = runs.length && gap(runs[0]) <= 40 ? [aimYd(runs[0][0], d), aimYd(runs[0][1], d)] : null;
+  const arc = (a0, a1) => (a1 - a0) * Math.PI / 180 * d;   // yards across the shot at d (along the arc): the offsets' difference would shrink a dogleg's widths by cos(aim)
+  const fw = runs.length && gap(runs[0]) <= 40 ? [aimYd(runs[0][0], d), aimYd(runs[0][1], d)] : null, fwW = fw ? arc(runs[0][0], runs[0][1]) : null;
   const w0 = o.window[0], w1 = o.window[1];
-  return { d, aL, w0, w1, l: aimYd(w0, d), r: aimYd(w1, d), width: aimYd(w1, d) - aimYd(w0, d), aim: aimYd(o.best.aim, d), step: aimYd(state.P.aim_step || 2, d), fw, lieL: lie(w0), lieR: lie(w1) };
+  return { d, aL, w0, w1, l: aimYd(w0, d), r: aimYd(w1, d), width: arc(w0, w1), fwW, aim: aimYd(o.best.aim, d), step: arc(0, state.P.aim_step || 2), fw, lieL: lie(w0), lieR: lie(w1) };
 }
 function aimText(a, atYd){ if (a===0) return "straight at the pin line"; const yd = atYd ? Math.round(Math.abs(aimYd(a, atYd))) : 0; return Math.abs(a)+"° "+(a<0?"left":"right")+(yd?` — about ${yd} yd ${a<0?"left":"right"} of the pin line at ${Math.round(atYd)}`:" of the pin line"); }
 function aimShort(a){ return a===0? "0°" : Math.abs(a)+"° "+(a<0?"L":"R"); }
@@ -652,7 +653,7 @@ function drawMap(h, r){
       // the window at the landing distance (session O, slice 4): a red band across the hole where the window's aims reach the median landing,
       // drawn over the tee shot's cloud, one label above its middle (its edges in yards off the pin line, its width)
       const LW = landingWindow(c, h, r);
-      cv.dataset.window = LW ? JSON.stringify({ d: LW.d, aL: LW.aL, w0: LW.w0, w1: LW.w1, l: +LW.l.toFixed(1), r: +LW.r.toFixed(1), fw: LW.fw ? LW.fw.map(v => +v.toFixed(1)) : null, lieL: LW.lieL, lieR: LW.lieR }) : "";
+      cv.dataset.window = LW ? JSON.stringify({ d: LW.d, aL: LW.aL, w0: LW.w0, w1: LW.w1, l: +LW.l.toFixed(1), r: +LW.r.toFixed(1), width: +LW.width.toFixed(1), fwW: LW.fwW == null ? null : +LW.fwW.toFixed(1), fw: LW.fw ? LW.fw.map(v => +v.toFixed(1)) : null, lieL: LW.lieL, lieR: LW.lieR }) : "";
       if (LW) { const rM = LW.d * YD; const at = (a, rr) => { const t = a * Math.PI / 180; return px(Math.cos(t) * rr, Math.sin(t) * rr); };
         const arcAt = (a0, a1) => { ctx.beginPath(); for (let a = a0, i = 0; a <= a1 + 1e-9; a += 0.25, i++) { const [qx, qy] = at(a, rM); i ? ctx.lineTo(qx, qy) : ctx.moveTo(qx, qy); } };
         ctx.save(); ctx.lineCap = "round";
@@ -1045,8 +1046,8 @@ function renderHole(){
     const landYd = r.landing ? Math.hypot(r.landing[0], r.landing[1])/YD : o.total; const LW = landingWindow(c, h, r);
     html += `<div class="shot"><div class="E num">${fmt(r.E)}<small>strokes expected</small></div><div class="big">${o.club}<small>${aimText(b.aim, landYd)}</small></div>
       <div style="color:var(--ink2);font-size:13.5px;margin-top:2px">${Math.round(o.carry)} carry, ${Math.round(o.total)} total here (${c.alt_ft.toLocaleString()} ft${state.P.wind_mph>0?", "+windText():""})</div>
-      <div style="color:var(--ink2);font-size:13.5px;margin-top:4px" id="windowLine">Window ${aimShort(o.window[0])} to ${aimShort(o.window[1])} costs under 0.05${LW ? ` — at <b>${Math.round(LW.d)}</b> yd ${LW.w1 > LW.w0 ? `<b>${Math.round(LW.width)}</b> yd across, ${spanText(LW.l, LW.r, true)}` : `one aim, ${Math.round(LW.l) ? sideYd(LW.l) + " of the pin line" : "on the pin line"}`} (the red ${LW.w1 > LW.w0 ? "band" : "mark"} on the map)` : ""}${o.straight?` · straight at the pin line ${fmt(o.straight.E)}`:` · scanned around the fairway's own line (${aimShort(o.aim0)})`}</div>
-      ${LW ? `<div style="color:var(--ink2);font-size:13.5px;margin-top:2px" id="windowGround">${LW.fw ? `The fairway there runs ${spanText(LW.fw[0], LW.fw[1], false)} (${Math.round(LW.fw[1] - LW.fw[0])} yd)` : `No fairway crosses ${Math.round(LW.d)} yd near the landing`}; ${LW.w1 > LW.w0 ? (LW.lieL === LW.lieR ? `both edges of the window are ${edgeWord(LW.lieL)}` : `the window's left edge is ${edgeWord(LW.lieL)}, its right edge ${edgeWord(LW.lieR)}`) : `the aim's spot there is ${edgeWord(LW.lieL)}`}. <span style="color:var(--mute)">The aims are ${state.P.aim_step || 2}° apart: about ${Math.round(LW.step)} yd there.</span></div>` : ""}
+      <div style="color:var(--ink2);font-size:13.5px;margin-top:4px" id="windowLine">Window ${aimShort(o.window[0])} to ${aimShort(o.window[1])} costs under 0.05${LW ? ` — at <b>${Math.round(LW.d)}</b> yd ${LW.w1 > LW.w0 ? `<b>${Math.round(LW.width)}</b> yd across the shot, ${spanText(LW.l, LW.r, true)}` : `one aim, ${Math.round(LW.l) ? sideYd(LW.l) + " of the pin line" : "on the pin line"}`} (the red ${LW.w1 > LW.w0 ? "band" : "mark"} on the map)` : ""}${o.straight?` · straight at the pin line ${fmt(o.straight.E)}`:` · scanned around the fairway's own line (${aimShort(o.aim0)})`}</div>
+      ${LW ? `<div style="color:var(--ink2);font-size:13.5px;margin-top:2px" id="windowGround">${LW.fw ? `The fairway there runs ${spanText(LW.fw[0], LW.fw[1], false)} (${Math.round(LW.fwW)} yd across)` : `No fairway crosses ${Math.round(LW.d)} yd near the landing`}; ${LW.w1 > LW.w0 ? (LW.lieL === LW.lieR ? `both edges of the window are ${edgeWord(LW.lieL)}` : `the window's left edge is ${edgeWord(LW.lieL)}, its right edge ${edgeWord(LW.lieR)}`) : `the aim's spot there is ${edgeWord(LW.lieL)}`}. <span style="color:var(--mute)">The aims are ${state.P.aim_step || 2}° apart: about ${Math.round(LW.step)} yd there.</span></div>` : ""}
       ${oddsBar(b.odds)}${oddsLabels(b.odds)}
       <div class="rows">
         <div><span>Leaves</span><span><b>${Math.round(b.rem)}</b> yd, plays <b>${Math.round(b.plays)}</b> (${sgn(A?A.dz:0,0)} ft)</span></div>
