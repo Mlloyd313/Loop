@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from public data: lidar elevation, mapped surfaces, the club's own card and your dispersion.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="52d5df9bb3">
+<meta name="loop-build" content="0501b4975a">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -450,7 +450,7 @@ function setGround(c){ const pk = isParkland(c), w = dW(c); ODDS = pk ? ODDS_BAS
 // ---------------- state ----------------
 const store = { get(k, d){ try{ const v = localStorage.getItem("loop."+k); return v==null? d : JSON.parse(v);}catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem("loop."+k, JSON.stringify(v)); }catch(e){} } };
 const state = { overrides: store.get("overrides", {}), pins: store.get("pins", {}), fixMode: false, markMode: false, pendingPen: 0, course: store.get("course", D.courses[0].key), hole: store.get("hole", 15), view: "hole", P: Object.assign({}, D.defaults, store.get("P", {})), rounds: store.get("rounds", []), swings: store.get("swings", []), practice: store.get("practice", []), activeRound: store.get("activeRound", null), openRound: null, tap: null, showSurf: false, results: {}, busy: null, ledger: {} };
-E.setOverrides(state.overrides);
+E.setOverrides(appliedOverrides());
 // the golfer's clubs as played (the level's table with your own carries on top): the swing ledger reads lateral misses as shares of these
 function clubsAsPlayed(){ return E.clubTable(state.P).map(c => Object.assign({}, c, (state.P.clubsOverride || []).find(o => o.name === c.name) || {})); }
 SW.setClubs(clubsAsPlayed());
@@ -794,10 +794,29 @@ function setGreen(h, x, y){
   if (poly == null) gs.forEach((p, i) => { const cx = p.reduce((s,q)=>s+q[0],0)/p.length, cy = p.reduce((s,q)=>s+q[1],0)/p.length; const d = Math.hypot(cx-x, cy-y); if (d < 30 && d < best) { best = d; poly = i; } });
   let pin = [x, y]; if (poly != null) { const p = gs[poly]; pin = [p.reduce((s,q)=>s+q[0],0)/p.length, p.reduce((s,q)=>s+q[1],0)/p.length]; }
   state.overrides[h._key] = { pin: [Math.round(pin[0]*10)/10, Math.round(pin[1]*10)/10], poly, latlon: frameToLatLon(course(), h, pin) };
-  store.set("overrides", state.overrides); E.setOverrides(state.overrides); state.results = {}; state.tap = null; setFixMode(false);
+  store.set("overrides", state.overrides); E.setOverrides(appliedOverrides()); state.results = {}; state.tap = null; setFixMode(false);
   renderHole(); startBackground(); toast(poly != null ? "Green moved to the mapped green you tapped. Reset it from the map tools." : "Green moved to the tapped point (12-yd disc; no mapped green there). Reset it from the map tools.");
 }
-function clearGreen(h){ delete state.overrides[h._key]; store.set("overrides", state.overrides); E.setOverrides(state.overrides); state.results = {}; renderHole(); startBackground(); toast("Green reset to the map's own."); }
+function clearGreen(h){ delete state.overrides[h._key]; store.set("overrides", state.overrides); E.setOverrides(appliedOverrides()); state.results = {}; renderHole(); startBackground(); toast("Green reset to the map's own."); }
+// A green correction is applied only to the map it was made on (session R's independent check, 2026-10-10). It is kept as frame metres and an
+// index into the hole's mapped greens; a rebuild that moves the hole's frame (Mesa on its 2024 layout moved 17 of 18) or changes its list of
+// greens would put it on the wrong ground, so one whose saved lat/lon no longer falls on its pin, or whose green is no longer the one it
+// named, is kept and listed in Settings → Corrections as made on an older map, and not applied.
+function correctionFits(c, h, o){
+  if (!o || !o.pin || !h || h.nodata || !h.frame) return false;
+  if (o.latlon) { const ll = frameToLatLon(c, h, o.pin), k = Math.cos(c.origin[0] * Math.PI / 180);
+    if (Math.hypot((ll[0] - o.latlon[0]) * 110574, (ll[1] - o.latlon[1]) * k * 111320) > 3) return false; }
+  if (o.poly != null) { const g = (h.polys && h.polys.greens || [])[o.poly]; if (!g) return false;
+    if (Math.hypot(g.reduce((s, q) => s + q[0], 0) / g.length - o.pin[0], g.reduce((s, q) => s + q[1], 0) / g.length - o.pin[1]) > 1) return false; }
+  return true;
+}
+function correctionHole(k){ const [ck, hn] = k.split(":"); const c = D.courses.find(x => x.key === ck); const h = c && c.holes.find(x => String(x.hole) === hn); return c && h ? [c, h] : null; }
+function appliedOverrides(){ const out = {}; for (const k in state.overrides) { const ch = correctionHole(k); if (ch && correctionFits(ch[0], ch[1], state.overrides[k])) out[k] = state.overrides[k]; } return out; }
+function staleCorrections(){ return Object.keys(state.overrides).filter(k => { const ch = correctionHole(k); return !ch || !correctionFits(ch[0], ch[1], state.overrides[k]); }); }
+// the hole's drawn line when it is not the card's length (session R's independent check): the engine prices the line it draws — Mesa 2 and
+// 14 from the club's plan's tees (189 and 311 yd; the card says 179 and 346) — so the page gives both
+function lineYd(h){ let s = 0; for (let i = 1; i < h.line.length; i++) s += Math.hypot(h.line[i][0] - h.line[i - 1][0], h.line[i][1] - h.line[i - 1][1]); return s / YD; }
+function offCard(h){ if (h.nodata || !h.line) return null; const L = Math.round(lineYd(h)); return Math.abs(L - h.card) >= Math.max(8, 0.03 * h.card) ? L : null; }
 function frameToLatLon(c, h, p){ const f = h.frame; const wx = f.origin[0] + p[0]*f.u[0] + p[1]*f.v[0], wy = f.origin[1] + p[0]*f.u[1] + p[1]*f.v[1]; const [lat0, lon0] = c.origin; return [Math.round((lat0 + wy/110574)*1e6)/1e6, Math.round((lon0 + wx/(Math.cos(lat0*Math.PI/180)*111320))*1e6)/1e6]; }
 function setFixMode(on){ if (on && state.markMode) { state.markMode = false; renderPlayRow(); }   // one map mode at a time: fixing the green ends Mark ball's tap
   state.fixMode = on; const hint = $("#mapHint"); hint.classList.toggle("fix", on); hint.textContent = on ? "Fix green: tap the green this hole really plays to (Cancel to stop)" : "Tap the map: from here?"; $("#fixGreen").style.fontWeight = on ? "700" : "400"; $("#fixGreen").textContent = on ? "Cancel" : E.overrideFor(hole()) ? "Reset green" : "Fix green"; syncTools(); }
@@ -1070,7 +1089,7 @@ function renderHole(){
   const live = (() => { const a = activeRound(); return !!(a && a.course === state.course); })();   // a round in progress here: the page is for the shot at hand
   const ovr = E.overrideFor(h); $("#fixGreen").textContent = state.fixMode ? "Cancel" : ovr ? "Reset green" : "Fix green"; $("#fixGreen").style.fontWeight = state.fixMode ? "700" : "400";
   const A = r.approach; let html = store.get("hintSeen", false) ? "" : `<div class="hint noprint"><span>The red line is the engine's tee shot for your pattern on this ground; the dots are where it lands. Tap the map to ask “from here?”.</span><button id="hintOk">Got it</button></div>`;
-  html += `<h1>Hole ${h.hole}<span class="meta">Par ${h.par} · ${h.card} yards · SI ${h.si||"–"} · plays ${(h.bearing!=null)?compass(h.bearing):""} · ${sgn(h.pin_ft - h.tee_ft,0)} ft tee to green</span></h1>`;
+  html += `<h1>Hole ${h.hole}<span class="meta">Par ${h.par} · ${h.card} yards${offCard(h) != null ? ` on the card, ${offCard(h)} on this line` : ""} · SI ${h.si||"–"} · plays ${(h.bearing!=null)?compass(h.bearing):""} · ${sgn(h.pin_ft - h.tee_ft,0)} ft tee to green</span></h1>`;
   html += pinRow(c, h) + (keepNote ? `<div id="noteRowSlot"></div>` : noteRow(c, h));
   // the answer to "from here?" comes first, so a phone sees it right under the map
   if (state.tap && state.tap.res && state.tap.res.fromLie === LIE.GREEN) { const t = state.tap, a = t.res; const ft = Math.round(a.from * 3); const ex = E.baseAt(E.lut(state.P.baseline, "green_ft"), ft);
@@ -1128,7 +1147,7 @@ function renderHole(){
     more += rulesBlock(c, h, r);
   }
   html += live ? `<details class="more" id="moreOnHole"><summary>More on this hole — the elevation, every tee option, the same shot by other rules</summary>${more}</details>` : more;
-  html += `<div class="src">${ovr ? `<b>Green moved by you</b> (${ovr.poly != null ? "to a mapped green" : "to a tapped point, 12-yd disc"}; the elevation profile, the line and every number follow it; this correction lives in this browser — Settings → Corrections has it as text for the rebuild). ` : ""}${c.routing ? `Routing: ${esc(c.routing)}. ` : ""}Surfaces: fairway from ${h.src.fairway==="osm"?"OpenStreetMap":h.src.fairway==="imagery"?"the aerial imagery":h.par===3?"nowhere (a par 3: priced tee to green)":"nowhere (unpriced)"}, green from ${h.src.green==="osm"?"OpenStreetMap":h.src.green==="imagery"?(h.src.green_imagery?`${h.src.green_imagery} imagery`:"the aerial imagery")+(h.src.green_m2?` (${h.src.green_m2} m², grown from the pin)`:""):"a 12-yard disc at the line end"}${h.src.sand?`, sand from ${srcName(h.src.sand)}${h.src.sand_reader?` (${esc(h.src.sand_reader)})`:""}`:""}${h.src.water&&h.src.water!=="none"?`, water from ${srcName(h.src.water)}`:""}${h.src.rough_naip_m2?`, ${h.src.rough_naip_m2} m² of turf the Esri picture shows dormant read as rough from NAIP`:""}${h.src.imagery?`; the imagery read is ${h.src.imagery} (public domain) because Esri's shows this course dormant — the picture above is still Esri's`:h.src.hazards_imagery?`; bunkers and water read from ${h.src.hazards_imagery} (public domain; bunkers found 0.74–0.97 and 0.85–0.95 of the blobs real against OpenStreetMap's, held out by course)`:""}${h.src.picture?`; the picture above, and the surfaces read from it, are ${esc(h.src.picture)}`:""}${h.src.naip?`; ${h.src.naip.startsWith("not read: ")?`USDA NAIP is not read here: ${esc(h.src.naip.slice(10))}`:esc(h.src.naip)}`:""}. Elevation: ${(c.lidar&&c.lidar.title)||"USGS 3DEP"}. Player: ${esc(playerLabel())} — ${playerSources()}${state.P.clubsOverride?"; your own club table on top":""}; spread at ${Math.round(state.P.disp*100)}%, ${Math.round(state.P.q_miss*100)}% off-centre strikes, the ${curveName(state.P.baseline)} curve (ESTIMATED; pipeline/players). ${desertRuleText(c, h)} ${oobText(c, h)} The numbers compare options and are not a score prediction.</div>`;
+  html += `<div class="src">${!ovr && state.overrides[h._key] ? `<b>A green correction saved in this browser was made on an older map of this hole</b> and is not applied (Settings → Corrections lists it; Fix green sets it again on this map). ` : ""}${ovr ? `<b>Green moved by you</b> (${ovr.poly != null ? "to a mapped green" : "to a tapped point, 12-yd disc"}; the elevation profile, the line and every number follow it; this correction lives in this browser — Settings → Corrections has it as text for the rebuild). ` : ""}${c.routing ? `Routing: ${esc(c.routing)}. ` : ""}${h.course_note ? `This hole: ${esc(h.course_note)}. ` : ""}Surfaces: fairway from ${h.src.fairway==="osm"?"OpenStreetMap":h.src.fairway==="imagery"?"the aerial imagery":h.par===3?"nowhere (a par 3: priced tee to green)":"nowhere (unpriced)"}, green from ${h.src.green==="osm"?"OpenStreetMap":h.src.green==="imagery"?(h.src.green_imagery?`${h.src.green_imagery} imagery`:"the aerial imagery")+(h.src.green_m2?` (${h.src.green_m2} m², grown from the pin)`:""):"a 12-yard disc at the line end"}${h.src.sand?`, sand from ${srcName(h.src.sand)}${h.src.sand_reader?` (${esc(h.src.sand_reader)})`:""}`:""}${h.src.water&&h.src.water!=="none"?`, water from ${srcName(h.src.water)}${h.src.water_reader?` (${esc(h.src.water_reader)})`:""}`:""}${h.src.rough_naip_m2?`, ${h.src.rough_naip_m2} m² of turf the Esri picture shows dormant read as rough from NAIP`:""}${h.src.imagery?`; the imagery read is ${h.src.imagery} (public domain) because Esri's shows this course dormant — the picture above is still Esri's`:h.src.hazards_imagery?`; bunkers and water read from ${h.src.hazards_imagery} (public domain; bunkers found 0.74–0.97 and 0.85–0.95 of the blobs real against OpenStreetMap's, held out by course)`:""}${h.src.picture?`; the picture above, and the surfaces read from it, are ${esc(h.src.picture)}`:""}${h.src.naip?`; ${h.src.naip.startsWith("not read: ")?`USDA NAIP is not read here: ${esc(h.src.naip.slice(10))}`:esc(h.src.naip)}`:""}. Elevation: ${(c.lidar&&c.lidar.title)||"USGS 3DEP"}. Player: ${esc(playerLabel())} — ${playerSources()}${state.P.clubsOverride?"; your own club table on top":""}; spread at ${Math.round(state.P.disp*100)}%, ${Math.round(state.P.q_miss*100)}% off-centre strikes, the ${curveName(state.P.baseline)} curve (ESTIMATED; pipeline/players). ${desertRuleText(c, h)} ${oobText(c, h)} The numbers compare options and are not a score prediction.</div>`;
   setCard(card, html, keepNote);
   const ct2 = $("#clearTap2"); if (ct2) ct2.addEventListener("click", () => { state.tap = null; $("#clearTap").style.display = "none"; renderHole(); });
   const ho = $("#hintOk"); if (ho) ho.addEventListener("click", () => { store.set("hintSeen", true); ho.parentElement.remove(); });
@@ -1436,8 +1455,8 @@ function renderRound(){
   html += `<div class="tablewrap"><table><thead><tr><th class="n">Hole</th><th class="n">Par</th><th class="n">Yards</th><th>Tee shot</th><th class="n">Expected</th><th class="n">Leaves · plays</th><th>Approach</th><th>Second shot</th><th class="n" title="${rr ? esc(roundLabel(rr)) : "typing a score starts a scores-only round for today"}">Your score${rr ? `<br><span style="font-weight:400">${esc(rr.date||"")}</span>` : ""}</th></tr></thead><tbody>`;
   for (const {h,r} of rows) {
     const sc = scoreOf(h);
-    if (!r) cards += `<div class="hc"><div class="l1"><a href="#" data-gohole="${h.hole}" class="hn">${h.hole}</a><span class="meta">par ${h.par} · ${h.card}</span><span class="muted">${h.nodata?"no measured line":"pricing…"}</span><input class="score" data-hole="${h.hole}" value="${sc}" inputmode="numeric" aria-label="Score, hole ${h.hole}"></div></div>`;
-    if (!r) { html += `<tr><td class="n">${h.hole}</td><td class="n">${h.par}</td><td class="n">${h.card}</td><td colspan="5" style="color:var(--mute)">${h.nodata?"no measured line":"…"}</td><td class="n"><input class="score" data-hole="${h.hole}" value="${sc}" style="width:44px;text-align:right;padding:2px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)" inputmode="numeric"></td></tr>`; continue; }
+    if (!r) cards += `<div class="hc"><div class="l1"><a href="#" data-gohole="${h.hole}" class="hn">${h.hole}</a><span class="meta">par ${h.par} · ${h.card}${offCard(h) != null ? ` (${offCard(h)} on the line)` : ""}</span><span class="muted">${h.nodata?"no measured line":"pricing…"}</span><input class="score" data-hole="${h.hole}" value="${sc}" inputmode="numeric" aria-label="Score, hole ${h.hole}"></div></div>`;
+    if (!r) { html += `<tr><td class="n">${h.hole}</td><td class="n">${h.par}</td><td class="n">${h.card}${offCard(h) != null ? `<br><small title="the line drawn from the tee">${offCard(h)} on the line</small>` : ""}</td><td colspan="5" style="color:var(--mute)">${h.nodata?"no measured line":"…"}</td><td class="n"><input class="score" data-hole="${h.hole}" value="${sc}" style="width:44px;text-align:right;padding:2px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)" inputmode="numeric"></td></tr>`; continue; }
     let tee="", app="", sec="", leaves="";
     if (r.kind==="tee") { const o=r.options[0], b=o.best; tee=`<b>${o.club}</b> ${aimShort(b.aim)}`; leaves=`${Math.round(b.rem)} · ${Math.round(b.plays)}`;
       if (r.approach&&r.approach.best) app=`${r.approach.club}, on ${pct(r.approach.best.odds.green)}`;
@@ -1445,9 +1464,9 @@ function renderRound(){
       else if (r.goLay&&r.goLay.lay) sec = `out of reach · lay up to ${r.goLay.lay.leave}`; }
     else if (r.kind==="par3") { const a=r.approach; tee=`<b>${a.club}</b>`; leaves=`plays ${Math.round(a.plays)}`; app = a.best && !r.curveOnly ?`on ${pct(a.best.odds.green)}`:"curve only"; }
     else tee = `<span style="color:var(--mute)">not priced</span>`;
-    cards += `<div class="hc"><div class="l1"><a href="#" data-gohole="${h.hole}" class="hn">${h.hole}</a><span class="meta">par ${h.par} · ${h.card}${sheetPin(c, h) ? ` · pin ${pinAbbr(sheetPin(c, h))}` : ""}${noteFor(c, h) ? ` · note` : ""}</span><span class="E num">${r.E!=null?fmt(r.E):"–"}</span><input class="score" data-hole="${h.hole}" value="${sc}" inputmode="numeric" aria-label="Score, hole ${h.hole}"></div>
+    cards += `<div class="hc"><div class="l1"><a href="#" data-gohole="${h.hole}" class="hn">${h.hole}</a><span class="meta">par ${h.par} · ${h.card}${offCard(h) != null ? ` (${offCard(h)} on the line)` : ""}${sheetPin(c, h) ? ` · pin ${pinAbbr(sheetPin(c, h))}` : ""}${noteFor(c, h) ? ` · note` : ""}</span><span class="E num">${r.E!=null?fmt(r.E):"–"}</span><input class="score" data-hole="${h.hole}" value="${sc}" inputmode="numeric" aria-label="Score, hole ${h.hole}"></div>
       <div class="l2">${tee}${leaves?` · ${r.kind==="par3"?leaves:"leaves "+leaves.replace(" · ", ", plays ")}`:""}${app?` → ${app}`:""}</div>${sec ? `<div class="l3">second shot: ${sec}</div>` : ""}</div>`;
-    html += `<tr><td class="n"><a href="#" data-gohole="${h.hole}" style="font-weight:600">${h.hole}</a>${sheetPin(c, h) ? `<br><span class="chip" title="today's pin on this hole: ${pinWords(sheetPin(c, h))}">${pinAbbr(sheetPin(c, h))}</span>` : ""}${noteFor(c, h) ? `<br><span class="chip" title="your note: ${escA(noteFor(c, h))}">note</span>` : ""}</td><td class="n">${h.par}</td><td class="n">${h.card}</td><td>${tee}</td><td class="n"><b>${fmt(r.E)}</b></td><td class="n">${leaves}</td><td>${app}</td><td>${sec}</td><td class="n"><input class="score" data-hole="${h.hole}" value="${sc}" style="width:44px;text-align:right;padding:2px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)" inputmode="numeric"></td></tr>`;
+    html += `<tr><td class="n"><a href="#" data-gohole="${h.hole}" style="font-weight:600">${h.hole}</a>${sheetPin(c, h) ? `<br><span class="chip" title="today's pin on this hole: ${pinWords(sheetPin(c, h))}">${pinAbbr(sheetPin(c, h))}</span>` : ""}${noteFor(c, h) ? `<br><span class="chip" title="your note: ${escA(noteFor(c, h))}">note</span>` : ""}</td><td class="n">${h.par}</td><td class="n">${h.card}${offCard(h) != null ? `<br><small title="the line drawn from the tee">${offCard(h)} on the line</small>` : ""}</td><td>${tee}</td><td class="n"><b>${fmt(r.E)}</b></td><td class="n">${leaves}</td><td>${app}</td><td>${sec}</td><td class="n"><input class="score" data-hole="${h.hole}" value="${sc}" style="width:44px;text-align:right;padding:2px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)" inputmode="numeric"></td></tr>`;
   }
   const scored = rows.filter(x=>x.r&&x.r.E!=null&&+scoreOf(x.h)>0);
   const vsModel = scored.reduce((s,x)=>s+(+scoreOf(x.h)-x.r.E),0);
@@ -1470,7 +1489,7 @@ function renderPocket(){
     if (r && r.kind==="tee") { const o=r.options[0]; tee=o.club; const ly = r.landing ? Math.round(Math.abs(aimYd(o.best.aim, Math.hypot(r.landing[0],r.landing[1])/YD))) : 0; line=aimShort(o.best.aim)+(ly?" ≈ "+ly+" yd "+(o.best.aim<0?"L":"R"):"")+" (win "+aimShort(o.window[0])+"–"+aimShort(o.window[1])+")"; then=`${Math.round(o.best.rem)} → plays ${Math.round(o.best.plays)}${r.approach?", "+r.approach.club:""}`; if (r.goLay&&r.goLay.delta!=null) call = r.goLay.delta>0.05?`go (+${fmt(r.goLay.delta)})`:`lay up ${r.goLay.lay.leave}`; }
     else if (r && r.kind==="par3") { tee=r.approach.club; then=`plays ${Math.round(r.approach.plays)} (${sgn(r.approach.dz,0)} ft)`; }
     const sp = nS ? sheetPin(c, h) : null;
-    html += `<tr><td>${h.hole}</td><td>${h.par}</td><td>${h.card}</td>${nS ? `<td>${sp ? pinWords(sp) + (Math.round(+sp.pin_lat || 0) ? ` ${Math.abs(Math.round(+sp.pin_lat))} ${+sp.pin_lat < 0 ? "L" : "R"}` : "") : ""}</td>` : ""}<td>${tee}</td><td>${line}</td><td>${then}</td><td>${call}</td>${anyNote ? `<td>${pocketSays(c, h)}</td>` : ""}</tr>`; }
+    html += `<tr><td>${h.hole}</td><td>${h.par}</td><td>${h.card}${offCard(h) != null ? ` <small>(${offCard(h)} on the line)</small>` : ""}</td>${nS ? `<td>${sp ? pinWords(sp) + (Math.round(+sp.pin_lat || 0) ? ` ${Math.abs(Math.round(+sp.pin_lat))} ${+sp.pin_lat < 0 ? "L" : "R"}` : "") : ""}</td>` : ""}<td>${tee}</td><td>${line}</td><td>${then}</td><td>${call}</td>${anyNote ? `<td>${pocketSays(c, h)}</td>` : ""}</tr>`; }
   $("#pocket").innerHTML = html + `</tbody></table>`;
 }
 // ---------------- the yardage book (session P): the course printed two holes a page ----------------
@@ -1581,7 +1600,7 @@ function bookMap(cv, c, h, r, F, A, scale){
 function bookText(c, h, r, F){
   const sp = sheetPin(c, h); const pinW = sp ? pinWords(sp) : state.P.pin + ((+state.P.pin_lat || 0) ? `, tucked ${Math.abs(+state.P.pin_lat)} ${+state.P.pin_lat < 0 ? "left" : "right"}` : "");
   const odds = o => ["fairway", "rough", "sand", "water", "desert", "oob"].filter(k => (o[k] || 0) >= 0.01).map(k => `${k === "oob" ? "out of bounds" : k === "desert" ? dW(c) : k} ${pct(o[k])}`).join(" · ");
-  let t = `<div class="ybtt">${h.hole}<span class="sub">Par ${h.par} · ${h.card} yd${h.si ? ` · SI ${h.si}` : ""}${F && F.dz ? ` · green ${Math.abs(F.dz)} ft ${F.dz < 0 ? "below" : "above"} the tee` : ""}</span></div>`;
+  let t = `<div class="ybtt">${h.hole}<span class="sub">Par ${h.par} · ${h.card} yd${offCard(h) != null ? ` (${offCard(h)} on the line)` : ""}${h.si ? ` · SI ${h.si}` : ""}${F && F.dz ? ` · green ${Math.abs(F.dz)} ft ${F.dz < 0 ? "below" : "above"} the tee` : ""}</span></div>`;
   if (!r) return t + `<p>${h.nodata ? "No measured line for this hole: not priced." : "Not priced yet."}</p>` + (noteFor(c, h) ? bookNote(c, h) : "");
   if (r.kind === "tee") { const o = r.options[0], b = o.best;
     t += `<p><span class="k">Tee:</span> <b>${o.club}</b> ${aimShort(b.aim)} (window ${aimShort(o.window[0])}–${aimShort(o.window[1])}): lands ${Math.round(Math.hypot(r.landing[0], r.landing[1]) / YD)}, leaves ${Math.round(b.rem)} (plays ${Math.round(b.plays)})${r.approach && r.approach.best ? ` → <b>${r.approach.club}</b>, on the green ${pct(r.approach.best.odds.green)}` : ""}</p>`;
@@ -1984,6 +2003,7 @@ Driver, 302, 328
   </section>
   <section><h3>Corrections</h3>
     <p class="help">Greens you moved with <b>Fix green</b>, as text for the rebuild: paste into <code>pipeline/overrides.json</code> (merge by course and hole) and run <code>run_all.py</code>; the aerial is then re-framed on the right green and the yardage book's pin can be fixed from the same numbers.</p>
+    ${staleCorrections().length ? `<p class="help" id="staleCorrections"><b>Made on an older map, not applied:</b> ${staleCorrections().map(k => { const ch = correctionHole(k); return ch ? `${esc(ch[0].club)} ${ch[1].hole}` : esc(k); }).join(", ")} — a rebuild moved the hole or its greens since (Mesa on its 2024 layout, 2026-10-10). Forget them below, or use <b>Fix green</b> on the hole again.</p>` : ""}
     <textarea id="corrections" readonly>${esc(JSON.stringify(correctionsJson(), null, 1))}</textarea>
     <p class="help"><button id="clearCorrections">Forget all corrections</button></p>
   </section>
@@ -2033,7 +2053,7 @@ Driver, 302, 328
   $("#resetAll").addEventListener("click", () => { state.P = Object.assign({}, D.defaults); saveP(); renderSettings(); toast("Settings reset."); });
   bindNotes();
 }
-function correctionsJson(){ const out = {}; for (const k in state.overrides) { const [ck, hn] = k.split(":"); const o = state.overrides[k]; (out[ck] = out[ck] || {})[hn] = { green_latlon: o.latlon, note: "moved in Loop on " + new Date().toISOString().slice(0,10) }; } return out; }
+function correctionsJson(){ const out = {}; for (const k in state.overrides) { const [ck, hn] = k.split(":"); const o = state.overrides[k]; (out[ck] = out[ck] || {})[hn] = Object.assign({ green_latlon: o.latlon, note: "moved in Loop on " + new Date().toISOString().slice(0,10) }, staleCorrections().includes(k) ? { stale: "made on an older map of this hole and not applied in Loop — check it before using it" } : {}); } return out; }
 function saveP(){ const keep = {}; for (const k in state.P) if (JSON.stringify(state.P[k]) !== JSON.stringify(D.defaults[k])) keep[k] = state.P[k]; store.set("P", keep); state.results = {}; SW.setClubs(clubsAsPlayed()); renderHeader(); if (state.view==="hole") renderHole(); startBackground(); }
 // ---------------- views ----------------
 function setView(v){ state.view = v; for (const id of ["hole","round","rounds","swing","settings"]) $("#view"+id[0].toUpperCase()+id.slice(1)).hidden = id!==v; renderHeader();
