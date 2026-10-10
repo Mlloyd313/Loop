@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="101ee6197c">
+<meta name="loop-build" content="c51e070d85">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -74,10 +74,30 @@ main{padding:14px 16px 60px;max-width:1500px;margin:0 auto}
 .maptop{position:sticky;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:2;height:0;margin:0 8px;display:flex;flex-direction:column;align-items:flex-end;justify-content:flex-end;gap:6px;pointer-events:none}
 .maptop>*{pointer-events:auto}
 .maptools{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
-.maptools button{background:rgba(255,255,255,.9);color:#17191c;border-color:transparent;font-size:12px;padding:4px 8px;backdrop-filter:blur(4px);touch-action:manipulation;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.maptools button,.toolsheet button{background:rgba(255,255,255,.9);color:#17191c;border-color:transparent;font-size:12px;padding:4px 8px;backdrop-filter:blur(4px);touch-action:manipulation;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+/* The map tools (session Q). On a phone the map keeps one row — Where I stand, Follow, Clear after a tap, Cancel while fixing a green, and
+   Tools — and Tools opens a sheet above it with the rest: Start a round, Price map, Surfaces, Fix green (the sheet follows the row in the
+   page, so a keyboard or a screen reader meets it after Tools). On a wide screen the sheet's buttons simply join the row. */
+.toolsbar{display:flex;flex-direction:column-reverse;align-items:flex-end;gap:6px;max-width:100%}
+.toolsheet{display:none;grid-template-columns:repeat(3,auto);gap:6px;padding:6px;border-radius:10px;background:rgba(255,255,255,.55);backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.3);max-width:100%;box-sizing:border-box}
+.toolsheet.open{display:grid}
+#sheetRound{display:contents}
+#sheetRound:empty{display:none}
+#startRoundBtn{grid-column:1/-1}
+@media (min-width:600px){.toolsheet{grid-template-columns:none;grid-auto-flow:column}#startRoundBtn{grid-column:auto}}
+.toolsheet button[aria-pressed="true"]{font-weight:700}
+.toolsheet button[aria-pressed="true"]::after{content:" ✓"}
+#toolsBtn.lit::after{content:" •";color:var(--engine);font-weight:700}
+#toolsBtn[aria-expanded="true"]{background:#17191c;color:#fff}
+#toolsBtn[aria-expanded="true"].lit::after{color:#ff8a8a}
+.maptools.fixing #clearTap{display:none!important}
+.maptop.sheetopen{z-index:4}
+.maptop.sheetopen .maphint{display:none}
+@media (min-width:861px){.toolsbar{flex-direction:row;flex-wrap:wrap;justify-content:flex-end;align-items:center}.toolsbar .maptools,.toolsbar .toolsheet{display:contents}#toolsBtn,#fixCancel{display:none!important}}
 .maphint{font-size:12px;color:#fff;background:rgba(0,0,0,.6);padding:4px 8px;border-radius:6px;max-width:85%}
 .maphint.fix{background:var(--plan);font-size:13px;font-weight:600}
-@media (pointer:coarse){.maptools button{font-size:13px;padding:8px 9px}.maphint{font-size:13px;padding:6px 10px}}
+@media (pointer:coarse){.maptools button,.toolsheet button{font-size:13px;padding:8px 9px}.maphint{font-size:13px;padding:6px 10px}}
+@media (max-width:374px){.maptools{gap:4px}.maptools button,.toolsheet button{padding-left:7px;padding-right:7px}}
 .card h1{font-family:var(--num);font-weight:700;font-size:30px;line-height:1.05;margin:0}
 .card h1 .meta{font:15px/1.3 var(--font);font-weight:400;color:var(--ink2);display:block;margin-top:6px}
 .shot{margin:18px 0 10px;padding:16px 18px;border-left:4px solid var(--engine);background:var(--panel);border-radius:0 10px 10px 0}
@@ -344,7 +364,10 @@ details.more>summary::marker{color:var(--mute)}
         <div class="maptop">
           <div class="maphint" id="mapHint">Tap the map: from here?</div>
           <div class="playtools" id="playtools" hidden></div>
-          <div class="maptools"><button id="gpsBtn" title="Price the shot from where you are standing (uses your device's location)">Where I stand</button><button id="followBtn" title="Follow me: the page keeps your position, switches to the hole you are on and prices the shot from where you stand — no taps (uses your device's location while this page is open)">Follow</button><button id="togglePrice" title="Every square yard priced: strokes to hole out from there, on your surfaces and elevation">Price map</button><button id="toggleSurf" title="Show the mapped surfaces the engine prices">Surfaces</button><button id="fixGreen" title="The hole plays to a different green than the map thinks: tap it">Fix green</button><button id="clearTap" style="display:none">Clear</button></div>
+          <div class="toolsbar">
+            <div class="maptools"><button id="gpsBtn" title="Price the shot from where you are standing (uses your device's location)">Where I stand</button><button id="followBtn" title="Follow me: the page keeps your position, switches to the hole you are on and prices the shot from where you stand — no taps (uses your device's location while this page is open)">Follow</button><button id="clearTap" style="display:none">Clear</button><button id="fixCancel" hidden title="Stop fixing the green">Cancel</button><button id="toolsBtn" aria-expanded="false" aria-controls="toolSheet" title="Start a round, the price map, the surfaces, Fix green">Tools</button></div>
+            <div class="toolsheet" id="toolSheet" role="group" aria-label="Map tools"><span id="sheetRound"></span><button id="togglePrice" aria-pressed="false" title="Every square yard priced: strokes to hole out from there, on your surfaces and elevation">Price map</button><button id="toggleSurf" aria-pressed="false" title="Show the mapped surfaces the engine prices">Surfaces</button><button id="fixGreen" title="The hole plays to a different green than the map thinks: tap it">Fix green</button></div>
+          </div>
         </div>
       </div>
       <div id="attrib" class="maplegend" style="padding-top:4px;padding-bottom:0" hidden><span style="--c:transparent">Imagery © Esri, Maxar, Earthstar Geographics and the GIS user community · map data © OpenStreetMap contributors</span></div>
@@ -666,8 +689,9 @@ function drawPriceMap(ctx, cv, h){
   ctx.save(); const lw = 120, lh = 10, lx = 12, ly = cv.height - 44; for (let i=0;i<lw;i++){ const c=priceColor(i/lw); ctx.fillStyle=`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; ctx.fillRect(lx+i, ly, 1, lh); }
   ctx.fillStyle="#fff"; ctx.font="bold 11px sans-serif"; ctx.fillText(lo.toFixed(1)+" strokes to hole out", lx, ly-4); ctx.textAlign="right"; ctx.fillText(hi.toFixed(1)+"+", lx+lw, ly+lh+12); ctx.restore();
 }
-$("#togglePrice").addEventListener("click", () => { state.showPrice = !state.showPrice; $("#togglePrice").style.fontWeight = state.showPrice? "700":"400"; if (!hole().nodata) drawMap(hole(), getResults(course()).holes[state.hole]); });
+$("#togglePrice").addEventListener("click", () => { state.showPrice = !state.showPrice; closeTools(true); syncTools(); if (!hole().nodata) drawMap(hole(), getResults(course()).holes[state.hole]); });
 $("#map").addEventListener("click", ev => {
+  if ($("#toolSheet").classList.contains("open")) { closeTools(); return; }   // a tap beside the open tools sheet closes it, nothing more
   const h = hole(); if (h.nodata) return; const cv = ev.currentTarget; const rect = cv.getBoundingClientRect();
   // canvas is object-fit: contain inside its box — compute the drawn area
   const scale = Math.min(rect.width / cv.width, rect.height / cv.height); const dw = cv.width*scale, dh = cv.height*scale; const ox = (rect.width-dw)/2, oy = (rect.height-dh)/2;
@@ -689,8 +713,25 @@ function setGreen(h, x, y){
 }
 function clearGreen(h){ delete state.overrides[h._key]; store.set("overrides", state.overrides); E.setOverrides(state.overrides); state.results = {}; renderHole(); startBackground(); toast("Green reset to the map's own."); }
 function frameToLatLon(c, h, p){ const f = h.frame; const wx = f.origin[0] + p[0]*f.u[0] + p[1]*f.v[0], wy = f.origin[1] + p[0]*f.u[1] + p[1]*f.v[1]; const [lat0, lon0] = c.origin; return [Math.round((lat0 + wy/110574)*1e6)/1e6, Math.round((lon0 + wx/(Math.cos(lat0*Math.PI/180)*111320))*1e6)/1e6]; }
-function setFixMode(on){ state.fixMode = on; const hint = $("#mapHint"); hint.classList.toggle("fix", on); hint.textContent = on ? "Fix green: tap the green this hole really plays to (tap Fix green again to cancel)" : "Tap the map: from here?"; $("#fixGreen").style.fontWeight = on ? "700" : "400"; }
-$("#fixGreen").addEventListener("click", () => { const h = hole(); if (h.nodata) return; if (state.fixMode) { setFixMode(false); return; } if (E.overrideFor(h)) { clearGreen(h); return; } setFixMode(true); });
+function setFixMode(on){ if (on && state.markMode) { state.markMode = false; renderPlayRow(); }   // one map mode at a time: fixing the green ends Mark ball's tap
+  state.fixMode = on; const hint = $("#mapHint"); hint.classList.toggle("fix", on); hint.textContent = on ? "Fix green: tap the green this hole really plays to (Cancel to stop)" : "Tap the map: from here?"; $("#fixGreen").style.fontWeight = on ? "700" : "400"; $("#fixGreen").textContent = on ? "Cancel" : E.overrideFor(hole()) ? "Reset green" : "Fix green"; syncTools(); }
+$("#fixGreen").addEventListener("click", () => { const h = hole(); closeTools(true); if (h.nodata) return; if (state.fixMode) { setFixMode(false); return; } if (E.overrideFor(h)) { clearGreen(h); return; } setFixMode(true); });
+$("#fixCancel").addEventListener("click", () => setFixMode(false));
+// ---- the tools sheet (session Q): Tools opens it on a phone; a choice in it, a tap elsewhere, Escape or a wider screen closes it ----
+function openTools(on, refocus){ const sh = $("#toolSheet"), b = $("#toolsBtn"), was = sh.classList.contains("open"); sh.classList.toggle("open", on); b.setAttribute("aria-expanded", String(on)); document.querySelector(".maptop").classList.toggle("sheetopen", on);
+  if (on && !was) { const f = [...sh.querySelectorAll("button")].find(x => x.offsetParent !== null); if (f) f.focus({ preventScroll: true }); }
+  else if (!on && was && refocus) b.focus({ preventScroll: true }); }
+function closeTools(refocus){ openTools(false, refocus); }
+function syncTools(){ $("#togglePrice").setAttribute("aria-pressed", String(!!state.showPrice)); $("#toggleSurf").setAttribute("aria-pressed", String(!!state.showSurf));
+  $("#togglePrice").style.fontWeight = state.showPrice ? "700" : "400"; $("#toggleSurf").style.fontWeight = state.showSurf ? "700" : "400";
+  $("#fixCancel").hidden = !state.fixMode; document.querySelector(".maptools").classList.toggle("fixing", !!state.fixMode); $("#toolsBtn").classList.toggle("lit", !!(state.showPrice || state.showSurf)); }
+$("#toolsBtn").addEventListener("click", () => openTools(!$("#toolSheet").classList.contains("open")));
+// a press anywhere else closes it (pointerdown: a phone's Safari sends no click for a tap on plain text) — except on the map strip, whose
+// buttons would move under the finger as the sheet closed (the play row sits above it): there the click closes it, after the button's own job
+document.addEventListener("pointerdown", ev => { if ($("#toolSheet").classList.contains("open") && !ev.target.closest("#toolSheet, #toolsBtn, #map, .maptop")) closeTools(); });
+document.querySelector(".maptop").addEventListener("click", ev => { if ($("#toolSheet").classList.contains("open") && !ev.target.closest("#toolSheet, #toolsBtn")) closeTools(); });
+document.querySelector(".maptop").addEventListener("focusout", ev => { const t = ev.relatedTarget; if ($("#toolSheet").classList.contains("open") && t && t.closest && !t.closest(".maptop")) closeTools(); });   // the focus left the map strip (inside it, a button's click closes the sheet)
+{ const wide = window.matchMedia("(min-width: 861px)"); const shut = () => closeTools(); if (wide.addEventListener) wide.addEventListener("change", shut); else if (wide.addListener) wide.addListener(shut); }
 $("#clearTap").addEventListener("click", () => { state.tap = null; $("#clearTap").style.display = "none"; renderHole(); });
 function priceFrom(x, y, label){ const h = hole(); const Ph = holeP(course(), h); const res = E.approach(h, [x,y], Ph, altf(course()), { n: 1200 }); const gl = res.from >= 160 ? E.goVsLay(h, [x,y], Ph, altf(course())) : null; state.tap = { x, y, res, gl, label }; $("#clearTap").style.display = ""; renderHole();
   if (res.fromLie === LIE.GREEN) { const ft = Math.round(res.from * 3); toast(`${ft} ft putt: ${fmt(E.baseAt(E.lut(state.P.baseline, "green_ft"), ft))} putts expected`); }
@@ -764,7 +805,7 @@ function setFollow(on, quiet){
 }
 $("#followBtn").addEventListener("click", () => setFollow(!state.follow));
 document.addEventListener("visibilitychange", () => { if (!state.follow) return; if (document.hidden) { if (follow.watch != null) { navigator.geolocation.clearWatch(follow.watch); follow.watch = null; } } else if (follow.watch == null) setFollow(true, true); });
-$("#toggleSurf").addEventListener("click", () => { state.showSurf = !state.showSurf; $("#toggleSurf").style.fontWeight = state.showSurf? "700":"400"; if (!hole().nodata) drawMap(hole(), getResults(course()).holes[state.hole]); });
+$("#toggleSurf").addEventListener("click", () => { state.showSurf = !state.showSurf; closeTools(true); syncTools(); if (!hole().nodata) drawMap(hole(), getResults(course()).holes[state.hole]); });
 // ---------------- rounds: the ledger ----------------
 // A round = one course, one date, a settings snapshot, and per hole the positions the ball was played from (shot 1 is always the tee),
 // the score and (optionally) the putts. Everything lives in localStorage (loop.rounds); Rounds → Export carries it between copies.
@@ -781,7 +822,7 @@ function startRound(courseKey){ const r = newRound(courseKey); state.rounds.push
 function finishRound(){ const r = activeRound(); if (!r) return; r.finished = new Date().toISOString(); state.activeRound = null; state.openRound = r.id; saveRounds(); setView("rounds"); toast("Round saved. Here is what it says."); }
 function invalidateLedger(roundId, holeNo){ const L = state.ledger[roundId]; if (!L) return; if (holeNo == null) delete state.ledger[roundId]; else { delete L.holes[holeNo]; L.res = null; } }
 function addMark(h, x, y, src, acc, club){
-  const r = activeRound(); if (!r || r.course !== state.course) { toast("Start a round first (Rounds view, or the Play button under the map)."); return; }
+  const r = activeRound(); if (!r || r.course !== state.course) { toast("Start a round first: ▶ Start a round in the map tools, or the Rounds view."); return; }
   const rec = roundRec(h, true); const t = new Date().toISOString(); let note = null;
   if (!rec.shots.length) {
     if (src === "tee" || Math.hypot(x, y) <= 40) { const tee = { x: 0, y: 0, src: "tee", t }; if (src === "tee" && club) tee.club = club; rec.shots.push(tee); note = (club ? club + " off the tee. " : "Tee shot marked. ") + "Mark the ball before your next shot."; src = null; }
@@ -794,6 +835,7 @@ function addMark(h, x, y, src, acc, club){
   if (note) toast(note);
 }
 function markBall(){
+  if (state.markMode) { setMarkMode(false); return; }   // the button reads Cancel in the tap mode
   const h = hole(); if (h.nodata) { toast("This hole has no map to mark on."); return; }
   if (navigator.geolocation && !IN_ARTIFACT) { const b = $("#markBtn"); if (b) { b.textContent = "Locating…"; b.disabled = true; }
     locate((err, p) => { if (b) { b.textContent = "Mark ball"; b.disabled = false; } if (err) { toast(err + " Tap the map where your ball lies instead."); setMarkMode(true); return; }
@@ -808,8 +850,11 @@ function saveScore(h, score, putts){ const r = activeRound() || currentRound(); 
   if (r.id === state.activeRound && i < c.holes.length - 1) { state.hole = c.holes[i + 1].hole; store.set("hole", state.hole); renderHeader(); toast(`Hole ${h.hole}: ${score}. On to ${state.hole}. ${done} of 18 scored.`); renderHole(); window.scrollTo({ top: 0 }); return; }
   else toast(`Hole ${h.hole}: ${score} saved.`); renderHole(); }
 function renderPlayRow(){
-  const el = $("#playtools"); const h = hole(); const a = activeRound(); const c = course();
-  if (!a) { el.hidden = false; el.innerHTML = `<button class="quiet" id="startRoundBtn" title="Log this round: mark the ball before every shot and Loop prices each one against its own engine">▶ Start a round on ${esc(c.name)}</button>`; $("#startRoundBtn").addEventListener("click", () => startRound(c.key)); return; }
+  const el = $("#playtools"); const h = hole(); const a = activeRound(); const c = course(); const sr = $("#sheetRound");
+  if (!a) { el.hidden = true; el.innerHTML = ""; if (sr.dataset.course !== c.key || !sr.firstChild) {   // kept while it says the same (a re-render keeps the focus on it)
+      sr.innerHTML = `<button id="startRoundBtn" title="Log this round: mark the ball before every shot and Loop prices each one against its own engine">▶ Start a round on ${esc(c.name)}</button>`; sr.dataset.course = c.key;
+      $("#startRoundBtn").addEventListener("click", () => { closeTools(true); startRound(c.key); }); } return; }
+  sr.innerHTML = ""; delete sr.dataset.course;
   if (a.course !== state.course) { const ac = D.courses.find(x => x.key === a.course); el.hidden = false; el.innerHTML = `<button class="quiet" id="goActive">Round in progress on ${esc(ac.name)} — go there</button><button class="quiet" id="finishOther">Finish it</button>`; $("#goActive").addEventListener("click", () => { state.course = a.course; store.set("course", a.course); state.hole = Math.max(1, ...Object.keys(a.holes||{}).map(Number), 1); store.set("hole", state.hole); renderHeader(); setView("hole"); }); $("#finishOther").addEventListener("click", finishRound); return; }
   const rec = roundRec(h, false); const n = rec ? rec.shots.length : 0; el.hidden = false;
   const r0 = h.nodata ? null : (getResults(c).holes[h.hole] || null);
@@ -934,7 +979,7 @@ function rulesBlock(c, h, r){
   <div class="src">Between dead zones at each club's landing (yards, the widest line within 10° of the fairway's own): ${widths}${d[o.club].crossed ? `; a hazard crosses ${o.club}'s landing` : ""}. ${isParkland(c) ? `Dead zones are the trees and water, and out of bounds when it is priced — the ground the engine prices above rough (the trees, OpenStreetMap's woods, are played as they lie at rough plus ${fmt(state.P.scrub_extra, 1)}; water a stroke and a drop).` : `Dead zones are desert, water and scrub, and out of bounds when it is priced — the ground the engine prices above rough (desert by the club's card where it has a desert rule — played, or a stroke and a drop at the grass line — and by the Rules elsewhere: played, a stroke and a drop, or stroke and distance, by your shares in Settings; water a stroke and a drop; scrub rough plus 0.4).`} DECADE's rule (GOLF.com, 2020: 65 yd between penalty hazards; Golf Digest, 2021: 70) is a heuristic for the expected-value answer; ${isParkland(c) ? `across the 138 priced par 4s and 5s of the Arizona and Nevada courses it picked a shorter club than the engine on 59 and cost 0.10 a hole on average (session K's run), never beating it, because it is priced by the same curve. Where the two disagree, the question is the model's inputs — how wide your pattern really is and what a ball under the trees really costs you — not which rule to follow;` : `across the 138 priced par 4s and 5s it picked a shorter club than the engine on 59 and cost 0.10 a hole on average (session K's run, before the cards' desert rules; 0.07 with every desert ball lost, when the engine itself left the driver in the bag on 30 % of them), never beating it, because it is priced by the same curve. Where the two disagree, the question is the model's inputs — how wide your pattern really is and what a desert ball really costs you — not which rule to follow;`} the three lines above say which way each would move the call. All model strokes, not a score prediction (pipeline/bench_rules.py, session K).</div>`;
 }
 function renderHole(){
-  const c = course(), h = hole(); const card = $("#holeCard");
+  const c = course(), h = hole(); const card = $("#holeCard"); syncTools();
   if (h.nodata) { renderPlayRow(); renderCallbar(c, h, null); card.innerHTML = `<h1>Hole ${h.hole}<span class="meta">Par ${h.par} · ${h.card} yards${h.si?` · SI ${h.si}`:""}</span></h1><p class="empty">This hole has no measured line yet (it sits outside the course's OpenStreetMap outline), so there is nothing to simulate. The plan's notes are below.</p>${roundBlock(c,h)}${planBlock(c,h,null)}`;
     const cv = $("#map"); cv.width = 420; cv.height = 300; const ctx = cv.getContext("2d"); ctx.fillStyle = "#2a2d31"; ctx.fillRect(0,0,420,300); ctx.fillStyle = "#9aa0a6"; ctx.font = "15px sans-serif"; ctx.textAlign = "center"; ctx.fillText("No aerial: this hole has no measured line", 210, 150); bindRoundBlock(c, h); return; }
   const r = ensureHole(c, h); drawMap(h, r); renderPlayRow(); renderCallbar(c, h, r); $("#clearTap").style.display = state.tap ? "" : "none";
@@ -1815,10 +1860,10 @@ async function useForecast(){
 }
 $("#q_forecast").addEventListener("click", useForecast);
 $("#q_apply").addEventListener("click", () => { state.P.wind_mph = +$("#q_wind").value || 0; state.P.wind_from = +$("#q_from").value || 0; state.P.temp_f = +$("#q_temp").value || 75; state.P.setting = $("#q_turf").value; state.P.pin = $("#q_pin").value; state.P.pin_lat = +$("#q_pinlat").value || 0; state.condNote = state.forecastNote || null; state.forecastNote = null; $("#q_fsrc").textContent = ""; $("#quick").hidden = true; $("#condChip").setAttribute("aria-expanded","false"); saveP(); toast("Conditions applied: " + windText() + ", " + state.P.temp_f + "°F, " + state.P.setting + ", " + pinText() + (state.condNote ? " — from the " + state.condNote : "")); });
-$("#courseSel").addEventListener("change", ev => { state.course = ev.target.value; store.set("course", state.course); state.hole = 1; store.set("hole", 1); state.tap = null; renderHeader(); setView(state.view); startBackground(); });
+$("#courseSel").addEventListener("change", ev => { state.course = ev.target.value; store.set("course", state.course); state.hole = 1; store.set("hole", 1); state.tap = null; state.holedOpen = false; setFixMode(false); state.markMode = false; renderHeader(); setView(state.view); startBackground(); });
 $("#holeStrip").addEventListener("click", ev => { const b = ev.target.closest("button[data-hole]"); if (!b) return; if (state.follow) follow.manualUntil = Date.now() + 90000; state.hole = +b.dataset.hole; store.set("hole", state.hole); state.tap = null; state.holedOpen = false; setFixMode(false); state.markMode = false; $("#clearTap").style.display="none"; renderHeader(); if (state.view!=="hole") setView("hole"); else renderHole(); });
 $$("nav.views button").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
-document.addEventListener("keydown", ev => { if (ev.target.matches("input,select,textarea")) return; if (ev.key==="ArrowRight"||ev.key==="ArrowLeft") { const c=course(); const i = c.holes.findIndex(h=>h.hole===state.hole); const j = Math.max(0, Math.min(c.holes.length-1, i + (ev.key==="ArrowRight"?1:-1))); state.hole = c.holes[j].hole; store.set("hole", state.hole); state.tap=null; renderHeader(); if (state.view==="hole") renderHole(); } });
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && $("#toolSheet").classList.contains("open")) { closeTools(!ev.target.matches("input,select,textarea")); return; } if (ev.target.matches("input,select,textarea")) return; if (ev.key==="ArrowRight"||ev.key==="ArrowLeft") { const c=course(); const i = c.holes.findIndex(h=>h.hole===state.hole); const j = Math.max(0, Math.min(c.holes.length-1, i + (ev.key==="ArrowRight"?1:-1))); state.hole = c.holes[j].hole; store.set("hole", state.hole); state.tap=null; state.holedOpen = false; setFixMode(false); state.markMode = false; renderHeader(); if (state.view==="hole") renderHole(); } });
 // boot
 if (IN_ARTIFACT || !navigator.geolocation) { $("#gpsBtn").style.display = "none"; $("#followBtn").style.display = "none"; }
 else if (store.get("follow", false)) setTimeout(() => setFollow(true, true), 800);   // the phone was following when it was last closed
