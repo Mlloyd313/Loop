@@ -158,12 +158,18 @@
   // ---------- today vs normal from the shots themselves (the ledger) ----------
   const GROUPS = { Driver: "driver", "3-wood": "woods", Hybrid: "woods", "4-iron": "long irons", "5-iron": "long irons", "6-iron": "mid irons", "7-iron": "mid irons", "8-iron": "mid irons", "9-iron": "short irons", PW: "short irons", GW: "wedges", SW: "wedges", LW: "wedges" };
   function clubGroup(c) { return GROUPS[c] || null; }
+  // The golfer's clubs as played (session O: the golfer is a level or their own table, no longer the build's one table): a lateral miss is
+  // read as a share of the club's carry for the golfer who hit it, so a day's shift turns back into the same yards in the engine. The page
+  // sets it from Settings; until it does (and in the tests) the build's default table is used, as swing_model.py's callers pass it.
+  let CLUBS = null;
+  function setClubs(t) { CLUBS = t && t.length ? t : null; }
+  function clubTab() { return CLUBS || D.clubs; }
   function shotRows(analyses) {
     const out = [];
     // the lateral miss against the line the engine gave for the shot (offAim); shots with no such line (lay-ups) are left out
     for (const a of analyses) { if (!a || a.sample) continue; for (const hn in a.holes) for (const s of a.holes[hn].shots) {
       const club = s.clubUsed || s.clubAssumed; if (s.offAim == null || !club || club === "partial wedge" || s.onGreen) continue; const g = clubGroup(club); if (!g) continue;
-      const carry = (D.clubs.find(c => c.name === club) || {}).carry || 150;
+      const carry = (clubTab().find(c => c.name === club) || {}).carry || 150;
       out.push({ round: a.id, date: a.date, hole: +hn, i: s.i, club, group: g, lat: s.offAim, latPct: s.offAim / carry, latLine: s.offLat, censored: !!s.offAimCensored, cat: s.cat }); } }
     return out;
   }
@@ -191,7 +197,7 @@
       const tl = t.map(r => r.latPct), pl = p.map(r => r.latPct);
       const normal = pl.length >= 6 ? median(pl) : 0;   // no history: the pin or fairway line (the engine's chosen line sits within a few yards of it)
       const dm = dayModel(p); const raw = median(tl) - normal; const shift = t.length / (t.length + dm.k) * raw;
-      const carry = (D.clubs.find(c => GROUPS[c.name] === g) || {}).carry || 150;
+      const carry = (clubTab().find(c => GROUPS[c.name] === g) || {}).carry || 150;
       const spreadT = t.length >= 4 ? mad(tl) : null, spreadN = pl.length >= 8 ? mad(pl) : null;
       out[g] = { n: t.length, nNormal: p.length, todayMedPct: r3(median(tl)), normalMedPct: r3(normal), shiftPct: r3(shift), shiftYd: r3(shift * carry), rawShiftYd: r3(raw * carry),
         k: r3(dm.k), tau: r3(dm.tau), sigma: r3(dm.sigma), tauFrom: dm.from, sigmaFrom: dm.sigmaFrom, nRoundsTau: dm.rounds,
@@ -330,5 +336,5 @@
   function lookVsPlay(swingChanged, scoresChanged) { return swingChanged && !scoresChanged ? "looks different, does not (yet) play better" : swingChanged && scoresChanged ? "looks and plays different" : !swingChanged && scoresChanged ? "plays different, the swing measurement did not move" : "neither has moved"; }
 
   window.LoopSwing = { SCHEMA, METRICS, NEVER, RULES, HYPOTHESES, normalize, sessionStats, baseline, compareMetric, todayVsNormal, linkShots, swingTime, shotRows, dayModel, todayShots, todayParams,
-    clubGroup, permutationTest, bootstrapCI, evalH1, evalH2, evalH3, evalGroups, graph, lookVsPlay, median, mad, mean, sd, fmtN, fmtMs, strikeOf, spotKind, associations };
+    clubGroup, setClubs, permutationTest, bootstrapCI, evalH1, evalH2, evalH3, evalGroups, graph, lookVsPlay, median, mad, mean, sd, fmtN, fmtMs, strikeOf, spotKind, associations };
 })();

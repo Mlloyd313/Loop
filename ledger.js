@@ -24,7 +24,7 @@
   function mad(a) { const m = median(a); if (m == null) return null; return median(a.map(x => Math.abs(x - m))) * 1.4826; }   // robust σ
   function round2(x) { return x == null || isNaN(x) ? null : Math.round(x * 100) / 100; }
   function lieWord(l) { return ({ 0: "desert", 1: "fairway", 2: "rough", 3: "green", 4: "sand", 5: "water", 6: "another green", 7: "waste area", 8: "scrub", 9: "tee", 10: "out of bounds" })[l] || "?"; }
-  function clubNames(P) { const names = D.clubs.map(c => c.name); for (const c of (P.clubsOverride || [])) if (!names.includes(c.name)) names.push(c.name); return names; }
+  function clubNames(P) { const names = E.clubTable(P).map(c => c.name); for (const c of (P.clubsOverride || [])) if (!names.includes(c.name)) names.push(c.name); return names; }
   // The day's pin on one hole (session Q, 2026-10-09). A hole record may carry the pin that hole was played to — { pin: "front" | "middle" |
   // "back", pin_lat: yards beside the hole line, − left / + right as seen from the fairway } — from the day's pin sheet (index.html). It
   // overrides the round's single pin setting for that hole only; a record without one is priced under the round's setting, as before.
@@ -170,10 +170,10 @@
   // full model it was started under and a stamp (curve and club-table fingerprints), and the Rounds view says when a stamp differs.
   const COND_KEYS = ["wind_mph", "wind_from", "temp_f", "setting", "pin", "pin_lat"];
   const MODEL_KEYS = ["baseline", "disp", "q_miss", "skew_right", "lat_pct", "dist_pct", "miss_lat_mult", "miss_short_pct", "miss_dist_mult", "lat_bias",
-    "desert_play", "desert_unplayable", "desert_lost", "desert_drop_extra", "scrub_extra", "short_game_extra", "home_ft", "alt_rule", "angles", "temp_pct_per_10f", "head_pct_per_mph", "tail_pct_per_mph", "cross_yd_per_mph", "clubsOverride"];
+    "desert_play", "desert_unplayable", "desert_lost", "desert_drop_extra", "scrub_extra", "short_game_extra", "home_ft", "alt_rule", "angles", "temp_pct_per_10f", "head_pct_per_mph", "tail_pct_per_mph", "cross_yd_per_mph", "clubsOverride", "player", "clubs"];
   function fnv(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return ("0000000" + h.toString(16)).slice(-8); }
   function curveId(name) { return name + ":" + fnv(JSON.stringify(D.bases[name] || null)); }
-  function modelStamp(P) { return { curve: curveId(P.baseline), clubs: fnv(JSON.stringify(D.clubs)), data: D.generated }; }
+  function modelStamp(P) { return { curve: curveId(P.baseline), clubs: fnv(JSON.stringify(E.clubTable(P))), data: D.generated }; }
   function snapshot(P) { const keep = {}; for (const k of COND_KEYS.concat(MODEL_KEYS)) if (P[k] !== undefined) keep[k] = JSON.parse(JSON.stringify(P[k])); keep._stamp = modelStamp(Object.assign({}, D.defaults, keep)); return keep; }
   // A round from before stamps: fill its model from the defaults it was being priced under and say so (assumed: no model change shipped
   // between the ledger's release, 2026-10-06, and the stamp).

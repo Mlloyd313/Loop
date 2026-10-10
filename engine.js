@@ -88,16 +88,19 @@
   }
 
   // ---------- clubs ----------
+  // The club table in play: the chosen player's (P.clubs: Tour, 10 or 20 handicap, or a golfer's own) or the build's default, the public
+  // scratch golfer (session O; until 2026-10-09 the default was the written plans' long scratch player, Driver 301). Mirrors engine.py club_table.
+  function clubTable(P) { return (P && P.clubs) || D.clubs; }
   function clubParams(name, P, altf) {
-    const c = D.clubs.find(c => c.name === name) || (P.clubsOverride || []).find(c => c.name === name);
+    const c = clubTable(P).find(c => c.name === name) || (P.clubsOverride || []).find(c => c.name === name);
     const over = (P.clubsOverride || []).find(c => c.name === name);
-    const carry0 = over ? over.carry : c.carry; const rf = over && over.roll_firm != null ? over.roll_firm : c.roll_firm; const rs = over && over.roll_soft != null ? over.roll_soft : c.roll_soft;
+    const carry0 = over && over.carry != null ? over.carry : c.carry; const rf = over && over.roll_firm != null ? over.roll_firm : c.roll_firm; const rs = over && over.roll_soft != null ? over.roll_soft : c.roll_soft;
     const carry = carry0 * altf * (1 + P.temp_pct_per_10f / 100 * (P.temp_f - 70) / 10);
     return { name, carry, roll: P.setting === "firm" ? rf : rs, latPct: over && over.lat_pct != null ? over.lat_pct : P.lat_pct, distPct: over && over.dist_pct != null ? over.dist_pct : P.dist_pct };
   }
   function clubForDistance(totalYd, P, altf, tee) {
     const rows = [];
-    for (const c of D.clubs) { if (c.name === "Driver" && !tee) continue; const cp = clubParams(c.name, P, altf); rows.push([cp.carry + cp.roll, cp]); }
+    for (const c of clubTable(P)) { if (c.name === "Driver" && !tee) continue; const cp = clubParams(c.name, P, altf); rows.push([cp.carry + cp.roll, cp]); }
     rows.sort((a, b) => a[0] - b[0]);
     if (totalYd >= rows[rows.length - 1][0]) { const r = Object.assign({}, rows[rows.length - 1][1]); r.shortBy = totalYd - rows[rows.length - 1][0]; return r; }
     if (totalYd <= rows[0][0]) { const k = totalYd / rows[0][0], r = rows[0][1]; return Object.assign({}, r, { name: "easy " + r.name, carry: r.carry * k, roll: r.roll * k }); }
@@ -356,5 +359,8 @@
   }
 
   for (const c of D.courses) for (const h of c.holes) h._key = c.key + ":" + h.hole;
-  window.LoopEngine = { setOverrides, overrideFor, pointInPoly, decodeHole, applyPin, lieAt, zAt, clubParams, clubForDistance, teeOptions, approach, goVsLay, runHole, priceAt, corridorRule, desertShares, L, YD, LIEFX, lut, baseAt, windComponents };
+  // a player level's clubs, pattern and curve into P (mirrors engine.py apply_player); the default level leaves the build's table in place
+  function applyPlayer(P, key) { const pl = D.players && D.players[key]; if (!pl) return P; Object.assign(P, JSON.parse(JSON.stringify(pl.pattern)), { baseline: pl.baseline, player: key });
+    if (key === D.defaults.player) delete P.clubs; else P.clubs = JSON.parse(JSON.stringify(pl.clubs)); return P; }
+  window.LoopEngine = { setOverrides, overrideFor, pointInPoly, decodeHole, applyPin, lieAt, zAt, clubTable, applyPlayer, clubParams, clubForDistance, teeOptions, approach, goVsLay, runHole, priceAt, corridorRule, desertShares, L, YD, LIEFX, lut, baseAt, windComponents };
 })();

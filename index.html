@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="b568c3bba3">
+<meta name="loop-build" content="2803806b56">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -267,6 +267,23 @@ details.more>summary::marker{color:var(--mute)}
   .pocket .sub{font-size:10px;color:#333;margin-bottom:6px}
   .round:not(.printing),.audit,.settings,.hole{display:none}
 }
+/* the player (session O): one question on first open, a chip in the header, the six numbers in Settings */
+.who{font-size:13px;color:var(--ink2);border:1px solid var(--rule);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.ask{position:fixed;inset:0;z-index:20;background:rgba(10,14,12,.55);display:flex;align-items:flex-start;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) 16px 16px;overflow-y:auto}
+.ask .sheet{background:var(--paper);color:var(--ink);border-radius:12px;max-width:640px;width:100%;padding:18px 18px 14px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.ask h2{margin:0 0 4px;font:700 22px var(--num)}
+.ask .lede{margin:0 0 12px;color:var(--ink2);font-size:14px}
+.ask .opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ask .opt{display:grid;gap:4px;text-align:left;padding:12px;border:1px solid var(--rule);border-radius:10px;background:var(--panel)}
+.ask .opt b{font:700 17px var(--num)} .ask .opt span{font-size:12.5px;color:var(--ink2)}
+.ask .opt:hover,.ask .opt:focus-visible{border-color:var(--ink)}
+.ask .opt[aria-pressed=true]{border-color:var(--engine);box-shadow:inset 0 0 0 1px var(--engine)}
+.ask .own{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:13px}
+.ask .srcs{font-size:11.5px;color:var(--mute);margin:10px 0 0}
+@media (max-width:560px){.ask .opts{grid-template-columns:minmax(0,1fr)}.ask .sheet{padding:14px 14px 12px}}
+.six{border-top:1px solid var(--rule);margin-top:6px}
+.six label:first-of-type{border-top:0}
+.settings .six input[type=number]{width:84px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .sr{position:absolute;left:-9999px}
 </style>
@@ -277,6 +294,7 @@ details.more>summary::marker{color:var(--mute)}
     <div class="wordmark">Loop<small>the caddie built from your data</small></div>
     <select class="course" id="courseSel" aria-label="Course"></select>
     <button class="cond" id="condChip" aria-expanded="false" title="Today's conditions"></button>
+    <button class="who" id="whoChip" title="The golfer the engine prices every shot for — tap to choose"></button>
     <nav class="views" aria-label="Views">
       <button data-view="hole" aria-current="page">Hole</button>
       <button data-view="round">Course</button>
@@ -325,6 +343,15 @@ details.more>summary::marker{color:var(--mute)}
   <section class="pocket" id="pocket"></section>
 </main>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="ask" id="askPlayer" hidden role="dialog" aria-modal="true" aria-labelledby="askTitle">
+  <div class="sheet">
+    <h2 id="askTitle">Which golfer are you?</h2>
+    <p class="lede">Loop prices every shot for one golfer: how far each club goes, how the shots spread, and what it takes to hole out from where they stop. Pick the nearest; Settings → You fine-tunes it or takes your own clubs.</p>
+    <div class="opts" id="askOpts"></div>
+    <div class="own"><button id="askOwn">Your own clubs…</button><button id="askSkip">Not now (scratch)</button></div>
+    <p class="srcs">From published data only: TrackMan's PGA TOUR averages, Shot Scope's averages by handicap, Broadie's Golfmetrics (2008) for how shots spread at each level; the drive widths are the model's (ESTIMATED). Model strokes, never a score prediction.</p>
+  </div>
+</div>
 <script src="data.js"></script>
 <script src="engine.js"></script>
 <script src="ledger.js"></script>
@@ -349,6 +376,49 @@ const ODDS = [["fairway","var(--fw)","fairway"],["rough","var(--rough)","rough"]
 const store = { get(k, d){ try{ const v = localStorage.getItem("loop."+k); return v==null? d : JSON.parse(v);}catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem("loop."+k, JSON.stringify(v)); }catch(e){} } };
 const state = { overrides: store.get("overrides", {}), pins: store.get("pins", {}), fixMode: false, markMode: false, pendingPen: 0, course: store.get("course", D.courses[0].key), hole: store.get("hole", 15), view: "hole", P: Object.assign({}, D.defaults, store.get("P", {})), planClubs: store.get("planClubs", {}), rounds: store.get("rounds", []), swings: store.get("swings", []), practice: store.get("practice", []), activeRound: store.get("activeRound", null), openRound: null, tap: null, showSurf: false, results: {}, busy: null, ledger: {} };
 E.setOverrides(state.overrides);
+// the golfer's clubs as played (the level's table with your own carries on top): the swing ledger reads lateral misses as shares of these
+function clubsAsPlayed(){ return E.clubTable(state.P).map(c => Object.assign({}, c, (state.P.clubsOverride || []).find(o => o.name === c.name) || {})); }
+SW.setClubs(clubsAsPlayed());
+// ---------------- the player (session O) ----------------
+// Loop prices every shot for one golfer. Four levels ship, each built from published data only (pipeline/players): its club table, its shot
+// pattern and its strokes-to-hole-out curve. The first open asks which is nearest; Settings → You holds the six numbers behind it and the
+// golfer's own clubs. Until 2026-10-09 every user got the written plans' player (Driver 301 carry, a fade) without being asked.
+const PLAYER_ORDER = ["tour", "scratch", "hcp10", "hcp20"].filter(k => D.players && D.players[k]);
+const PLAYER_BLURB = { tour: "Carries from TrackMan's PGA TOUR averages; the Tour's own strokes to hole out (Broadie).",
+  scratch: "Handicap 0. Carries from Shot Scope's scratch golfers' well-struck averages; the spread from Broadie's Golfmetrics.",
+  hcp10: "Handicap 10. Shot Scope's 10-handicaps: of their approaches from 150 yd, 35 in 100 miss short and 6 long.",
+  hcp20: "Handicap 20, near the USGA's bogey golfer. Shot Scope's 20-handicaps: of their approaches from 150 yd, 50 in 100 miss short and 4 long." };
+const WOODS = new Set(["Driver", "3-wood", "Hybrid"]);
+function playerKey(){ return state.P.player && D.players && D.players[state.P.player] ? state.P.player : D.defaults.player; }
+function playerBase(k){ const pl = D.players[k]; return k === D.defaults.player ? D.clubs : pl.clubs; }
+function playerEdited(){ const k = playerKey(), pl = D.players && D.players[k]; if (!pl) return false;
+  for (const f in pl.pattern) if (Math.abs((+state.P[f]) - (+pl.pattern[f])) > 1e-9) return true;
+  const sig = t => JSON.stringify(t.map(c => [c.name, c.carry, c.roll_firm, c.roll_soft]));
+  return sig(E.clubTable(state.P)) !== sig(playerBase(k)) || !!(state.P.clubsOverride && state.P.clubsOverride.length) || state.P.baseline !== pl.baseline; }
+function playerLabel(short){ const pl = D.players && D.players[playerKey()]; const name = pl ? pl.label : "Scratch"; return playerEdited() ? (short ? name + "*" : name + ", edited") : name; }
+function curveName(b){ return ({ tour: "PGA Tour", scratch: "scratch", hcp10: "10-handicap", hcp20: "20-handicap" })[b] || b; }
+function curveWho(b){ return ({ tour: "a Tour player", scratch: "a scratch golfer", hcp10: "a 10-handicap", hcp20: "a 20-handicap" })[b] || "the golfer"; }
+function playerSources(){ const k = playerKey();
+  return k === "tour" ? "clubs from TrackMan's PGA TOUR averages, the pattern fitted to Golfmetrics' Tour players (Broadie 2008)"
+    : k === "scratch" ? "clubs from Shot Scope's scratch performance averages, session E's pattern (it meets Golfmetrics' numbers for scratch)"
+    : `clubs from Shot Scope's ${k === "hcp10" ? "10" : "20"}-handicap performance averages, the pattern fitted to Golfmetrics and Shot Scope, the curve modelled from the scratch curve`; }
+// the half-width (share of carry) that holds 9 in 10 shots of the pattern's lateral mixture (good shots σ = lat, mishits × m; the skew left out)
+function erf(x){ const t = 1 / (1 + 0.3275911 * Math.abs(x)); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return x >= 0 ? y : -y; }
+function width90(lat, q, m){ const cdf = x => (1 - q) * erf(x / lat / Math.SQRT2) + q * erf(x / (lat * m) / Math.SQRT2); let lo = 0, hi = lat * m * 5; for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; if (cdf(mid) < 0.9) lo = mid; else hi = mid; } return (lo + hi) / 2; }
+function playerLine(k){ const pl = D.players[k], tab = playerBase(k); const d = tab.find(c => c.name === "Driver"), i7 = tab.find(c => c.name === "7-iron"); const p = pl.pattern;
+  return `Driver ${d.carry} carry · 7-iron ${i7.carry} · 9 drives in 10 within ±${Math.round(d.carry * width90(p.lat_pct, p.q_miss, p.miss_lat_mult))} yd`; }
+function choosePlayer(k){ const own = (state.P.clubsOverride || []).length; E.applyPlayer(state.P, k); store.set("playerAsked", true);
+  $("#askPlayer").hidden = true; state.tap = null; saveP(); setView(state.view); startBackground(); toast(`Pricing every shot for: ${D.players[k].label}${own ? ` — your own numbers for ${own} club${own === 1 ? "" : "s"} stay on top (Settings → Your own clubs)` : ""}.`); }
+function openAsk(){ $("#askOpts").innerHTML = PLAYER_ORDER.map(k => `<button class="opt" data-player="${k}" aria-pressed="${k === playerKey()}"><b>${D.players[k].label}</b><span>${playerLine(k)}</span><span>${PLAYER_BLURB[k] || ""}</span></button>`).join("");
+  $$("#askOpts [data-player]").forEach(b => b.addEventListener("click", () => choosePlayer(b.dataset.player)));
+  $("#askPlayer").hidden = false; const f = $("#askOpts [aria-pressed=true]") || $("#askOpts button"); if (f) f.focus(); }
+function closeAsk(){ if ($("#askPlayer").hidden) return; store.set("playerAsked", true); $("#askPlayer").hidden = true; renderHeader(); }
+// The six numbers behind a level, read from the clubs as played (your own carry where you typed one): the driver's and the 7-iron's carry,
+// the half-width holding 9 drives in 10, one standard deviation of a good shot's depth from 150 yd, the off-centre share and how much shorter
+// an off-centre strike flies. Read afresh on every change, so an edit is set to the number typed, never scaled twice.
+function sixNow(){ const P = state.P; const eff = n => { const c = E.clubTable(P).find(x => x.name === n); const o = (P.clubsOverride || []).find(x => x.name === n) || {}; return Object.assign({}, c, o); };
+  const d = eff("Driver"), i7 = eff("7-iron"); const lat = d.lat_pct != null ? d.lat_pct : P.lat_pct;
+  return { drv: d.carry, i7: i7.carry, lat, w: Math.round(d.carry * width90(lat, P.q_miss, P.miss_lat_mult)), dc: Math.round(P.dist_pct * 150 * 2) / 2, q: Math.round(P.q_miss * 100), ms: Math.round(P.miss_short_pct * 100) }; }
 // Scores entered before the ledger existed (one number per hole, no date) become one scores-only round per course, so nothing is lost.
 (function migrateScores(){ const old = store.get("scores", null); if (!old || !Object.keys(old).length) return; const byCourse = {};
   for (const k in old) { const [ck, hn] = k.split(":"); if (+old[k] > 0) (byCourse[ck] = byCourse[ck] || {})[hn] = { shots: [], score: +old[k] }; }
@@ -361,7 +431,7 @@ E.setOverrides(state.overrides);
 function hole(){ return course().holes.find(h => h.hole === state.hole) || course().holes[0]; }
 function altf(c){ return 1 + state.P.alt_rule/100 * (c.alt_ft - state.P.home_ft)/1000; }
 function planClubFor(c, h){ const o = state.planClubs[c.key+":"+h.hole]; return o === undefined ? h.plan.club : o; }
-function phash(){ const p = state.P; return JSON.stringify([p.setting,p.baseline,p.disp,p.q_miss,p.skew_right,p.wind_mph,p.wind_from,p.temp_f,p.pin,p.pin_lat||0,p.alt_rule,p.home_ft,p.lat_pct,p.dist_pct,p.clubsOverride||null,p.desert_play,p.desert_unplayable,p.desert_lost,p.desert_drop_extra,p.scrub_extra,p.short_game_extra||0,p.n,!!p.oob]); }
+function phash(){ const p = state.P; return JSON.stringify([p.player||null,p.clubs||null,p.miss_short_pct,p.miss_lat_mult,p.miss_dist_mult,p.setting,p.baseline,p.disp,p.q_miss,p.skew_right,p.wind_mph,p.wind_from,p.temp_f,p.pin,p.pin_lat||0,p.alt_rule,p.home_ft,p.lat_pct,p.dist_pct,p.clubsOverride||null,p.desert_play,p.desert_unplayable,p.desert_lost,p.desert_drop_extra,p.scrub_extra,p.short_game_extra||0,p.n,!!p.oob]); }
 function fmt(x, d=2){ return x==null||isNaN(x) ? "–" : (+x).toFixed(d); }
 function pct(x){ return x==null ? "–" : Math.round(x*100)+"%"; }
 function sgn(x, d=2){ return x==null ? "–" : (x>0?"+":"")+(+x).toFixed(d); }
@@ -422,6 +492,7 @@ function renderHeader(){
   const cur = $("#holeStrip button[aria-current='true']"); if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest", inline: "center" });
   const chH = state.view === "hole" ? c.holes.find(x => x.hole === state.hole) : null; const chP = chH ? sheetPin(c, chH) : null; const nS = nSheet(c);
   $("#condChip").innerHTML = `<span>${windText()}</span><span>${state.P.temp_f}°F</span><span>${state.P.setting}</span><span>${chP ? "pin " + pinWords(chP) + " (this hole)" : pinText() + (nS ? ` · ${nS} set today` : "")}</span>`;
+  $("#whoChip").textContent = playerLabel(true);
   $("#condChip").title = state.condNote ? "Today's conditions — " + state.condNote : "Today's conditions";
   $$("nav.views button").forEach(b => b.setAttribute("aria-current", b.dataset.view===state.view ? "page" : "false"));
   setHdr();
@@ -829,7 +900,7 @@ function rulesBlock(c, h, r){
     <div><span>If no desert ball were played as it lies — the card's stroke and drop at the grass line, every ball</span><span>${assume(R.casual, "the engine's call above")}</span></div>`
     : `<div><span>If every desert ball were lost (stroke and distance)</span><span>${assume(R.lost, "the engine's call above")}</span></div>
     <div><span>If you played the casual desert rule — a stroke and a drop at the edge, every ball</span><span>${assume(R.casual, "the engine's call above")}</span></div>`}
-    <div><span>If your pattern is 40 % wider than the scratch model</span><span>${assume(R.wide, "the engine's call above")}</span></div>
+    <div><span>If your pattern is 40 % wider than the ${esc(playerLabel())} model</span><span>${assume(R.wide, "the engine's call above")}</span></div>
   </div>
   <div class="src">Between dead zones at each club's landing (yards, the widest line within 10° of the fairway's own): ${widths}${d[o.club].crossed ? `; a hazard crosses ${o.club}'s landing` : ""}. Dead zones are desert, water and scrub, and out of bounds when it is priced — the ground the engine prices above rough (desert by the club's card where it has a desert rule — played, or a stroke and a drop at the grass line — and by the Rules elsewhere: played, a stroke and a drop, or stroke and distance, by your shares in Settings; water a stroke and a drop; scrub rough plus 0.4). DECADE's rule (GOLF.com, 2020: 65 yd between penalty hazards; Golf Digest, 2021: 70) is a heuristic for the expected-value answer; across the 138 priced par 4s and 5s it picked a shorter club than the engine on 59 and cost 0.10 a hole on average (session K's run, before the cards' desert rules; 0.07 with every desert ball lost, when the engine itself left the driver in the bag on 30 % of them), never beating it, because it is priced by the same curve. Where the two disagree, the question is the model's inputs — how wide your pattern really is and what a desert ball really costs you — not which rule to follow; the three lines above say which way each would move the call. All model strokes, not a score prediction (pipeline/bench_rules.py, session K).</div>`;
 }
@@ -846,7 +917,7 @@ function renderHole(){
   // the answer to "from here?" comes first, so a phone sees it right under the map
   if (state.tap && state.tap.res && state.tap.res.fromLie === LIE.GREEN) { const t = state.tap, a = t.res; const ft = Math.round(a.from * 3); const ex = E.baseAt(E.lut(state.P.baseline, "green_ft"), ft);
     html += `<div class="shot fromhere" id="fromHere" style="border-color:var(--plan)"><div class="E num">${fmt(ex)}<small>putts expected</small></div><div class="big">${ft} ft putt<small>from ${t.label === "mark" ? "where your ball lies" : t.label && t.label.startsWith("GPS") ? "where you stand" : "the tapped point"} on the green</small></div>
-      <div style="color:var(--ink2);font-size:13.5px;margin-top:4px">The ${state.P.baseline} green curve: a scratch player holes from here in ${fmt(ex)} on average${ft <= 3 ? "" : ft <= 10 ? " — the make-or-two-putt zone" : ft >= 40 ? " — lag it; three-putts start here" : ""}. No slope or contour is modelled.</div>
+      <div style="color:var(--ink2);font-size:13.5px;margin-top:4px">The ${curveName(state.P.baseline)} green curve: ${curveWho(state.P.baseline)} holes from here in ${fmt(ex)} on average${ft <= 3 ? "" : ft <= 10 ? " — the make-or-two-putt zone" : ft >= 40 ? " — lag it; three-putts start here" : ""}. No slope or contour is modelled.</div>
       <div style="margin-top:8px"><button id="clearTap2" style="padding:3px 10px;font-size:12.5px">Clear</button></div></div>`; }
   else if (state.tap && state.tap.res) { const t = state.tap, a = t.res;
     html += `<div class="shot fromhere" id="fromHere" style="border-color:var(--plan)"><div class="E num">${a.best?fmt(a.best.E):"–"}<small>to hole out</small></div><div class="big">${a.best?a.club:"No shot"}<small>from ${t.label === "mark" ? "where your ball lies" : t.label && t.label.startsWith("GPS") ? "where you stand" : "the tapped point"}: ${Math.round(a.from)} yd, plays ${Math.round(a.plays)} (${sgn(a.dz,0)} ft)</small></div>
@@ -881,7 +952,7 @@ function renderHole(){
   } else if (r.kind === "par3") {
     const a = r.approach;
     html += `<div class="shot"><div class="E num">${fmt(r.E)}<small>strokes expected</small></div><div class="big">${a.club}<small>plays ${Math.round(a.plays)} (${sgn(a.dz,0)} ft)</small></div>
-      ${a.best ? oddsBar(a.best.odds)+oddsLabels(a.best.odds) : `<div style="color:var(--mute);font-size:13.5px;margin-top:8px">No green surfaces are mapped here, so the number is the scratch curve for a ${Math.round(a.plays)}-yard shot, not a simulation.</div>`}
+      ${a.best ? oddsBar(a.best.odds)+oddsLabels(a.best.odds) : `<div style="color:var(--mute);font-size:13.5px;margin-top:8px">No green surfaces are mapped here, so the number is the ${curveName(state.P.baseline)} curve for a ${Math.round(a.plays)}-yard shot, not a simulation.</div>`}
       ${a.best ? `<div class="rows"><div><span>Best target</span><span>${a.best.lat===0?"at the pin":Math.abs(a.best.lat)+" yd "+(a.best.lat<0?"left":"right")}${a.best.depth?", "+Math.abs(a.best.depth)+" yd "+(a.best.depth<0?"short":"long"):""} · median ${Math.round(a.best.prox)} ft from the hole</span></div>
       <div><span>Curve from this distance</span><span>fairway lie <b>${fmt(a.curveFairway)}</b></span></div></div>`:""}</div>`;
     html += todayCard(c, h, r);
@@ -899,7 +970,7 @@ function renderHole(){
     more += rulesBlock(c, h, r);
   }
   html += live ? `<details class="more" id="moreOnHole"><summary>More on this hole — the written plan, the elevation, every tee option, the same shot by other rules</summary>${more}</details>` : more;
-  html += `<div class="src">${ovr ? `<b>Green moved by you</b> (${ovr.poly != null ? "to a mapped green" : "to a tapped point, 12-yd disc"}; the elevation profile, the line and every number follow it; this correction lives in this browser — Settings → Corrections has it as text for the rebuild). ` : ""}Surfaces: fairway from ${h.src.fairway==="osm"?"OpenStreetMap":h.src.fairway==="imagery"?"the aerial imagery":h.par===3?"nowhere (a par 3: priced tee to green)":"nowhere (unpriced)"}, green from ${h.src.green==="osm"?"OpenStreetMap":h.src.green==="imagery"?(h.src.green_imagery?`${h.src.green_imagery} imagery`:"the aerial imagery")+(h.src.green_m2?` (${h.src.green_m2} m², grown from the pin)`:""):"a 12-yard disc at the line end"}${h.src.sand?`, sand from ${srcName(h.src.sand)}`:""}${h.src.water&&h.src.water!=="none"?`, water from ${srcName(h.src.water)}`:""}${h.src.rough_naip_m2?`, ${h.src.rough_naip_m2} m² of turf the Esri picture shows dormant read as rough from NAIP`:""}${h.src.imagery?`; the imagery read is ${h.src.imagery} (public domain) because Esri's shows this course dormant — the picture above is still Esri's`:h.src.hazards_imagery?`; bunkers and water read from ${h.src.hazards_imagery} (public domain; bunkers found 0.74–0.97 and 0.85–0.95 of the blobs real against OpenStreetMap's, held out by course)`:""}. Elevation: ${(c.lidar&&c.lidar.title)||"USGS 3DEP"}. Dispersion: ${state.P.clubsOverride?"your club table":"the model calibrated to Arccos scratch green-hit rates (not a 3-handicap model; on these greens it hits fewer: see Settings)"} at ${Math.round(state.P.disp*100)}%, ${Math.round(state.P.q_miss*100)}% mishits, ${state.P.baseline} baseline. ${desertRuleText(c, h)} ${oobText(c, h)} The numbers compare options and are not a score prediction.</div>`;
+  html += `<div class="src">${ovr ? `<b>Green moved by you</b> (${ovr.poly != null ? "to a mapped green" : "to a tapped point, 12-yd disc"}; the elevation profile, the line and every number follow it; this correction lives in this browser — Settings → Corrections has it as text for the rebuild). ` : ""}Surfaces: fairway from ${h.src.fairway==="osm"?"OpenStreetMap":h.src.fairway==="imagery"?"the aerial imagery":h.par===3?"nowhere (a par 3: priced tee to green)":"nowhere (unpriced)"}, green from ${h.src.green==="osm"?"OpenStreetMap":h.src.green==="imagery"?(h.src.green_imagery?`${h.src.green_imagery} imagery`:"the aerial imagery")+(h.src.green_m2?` (${h.src.green_m2} m², grown from the pin)`:""):"a 12-yard disc at the line end"}${h.src.sand?`, sand from ${srcName(h.src.sand)}`:""}${h.src.water&&h.src.water!=="none"?`, water from ${srcName(h.src.water)}`:""}${h.src.rough_naip_m2?`, ${h.src.rough_naip_m2} m² of turf the Esri picture shows dormant read as rough from NAIP`:""}${h.src.imagery?`; the imagery read is ${h.src.imagery} (public domain) because Esri's shows this course dormant — the picture above is still Esri's`:h.src.hazards_imagery?`; bunkers and water read from ${h.src.hazards_imagery} (public domain; bunkers found 0.74–0.97 and 0.85–0.95 of the blobs real against OpenStreetMap's, held out by course)`:""}. Elevation: ${(c.lidar&&c.lidar.title)||"USGS 3DEP"}. Player: ${esc(playerLabel())} — ${playerSources()}${state.P.clubsOverride?"; your own club table on top":""}; spread at ${Math.round(state.P.disp*100)}%, ${Math.round(state.P.q_miss*100)}% off-centre strikes, the ${curveName(state.P.baseline)} curve (ESTIMATED; pipeline/players). ${desertRuleText(c, h)} ${oobText(c, h)} The numbers compare options and are not a score prediction.</div>`;
   card.innerHTML = html;
   const ct2 = $("#clearTap2"); if (ct2) ct2.addEventListener("click", () => { state.tap = null; $("#clearTap").style.display = "none"; renderHole(); });
   const ho = $("#hintOk"); if (ho) ho.addEventListener("click", () => { store.set("hintSeen", true); ho.parentElement.remove(); });
@@ -1089,7 +1160,7 @@ function renderRound(){
   html += `</tbody><tfoot><tr><td class="tot" colspan="4">Totals</td><td class="n tot">${nE?fmt(engE,1):"–"}</td><td></td><td class="n tot" style="color:var(--engine)">${nPlan?sgn(planE,1):""}</td><td colspan="3" style="color:var(--mute);font-size:12.5px">${scored.length?`Your ${scored.length} scores run ${sgn(vsModel,1)} against the model on those holes. The <a href="#" data-goview="rounds">Rounds</a> view prices every marked shot.`:"Scores typed here go into a scores-only round. To learn where the strokes went, start a round on the Hole page and mark the ball before each shot."}</td><td class="n tot">${scored.length?scored.reduce((s,x)=>s+ +scoreOf(x.h),0):""}</td></tr></tfoot></table></div>`;
   cards += `<div class="hc tot"><div class="l1"><span class="hn" style="background:none;color:var(--ink)">Σ</span><span class="meta">model strokes, ${nE} holes</span><span class="E num">${nE?fmt(engE,1):"–"}</span><span class="E num" style="color:var(--engine);font-size:15px">${nPlan?"plan "+sgn(planE,1):""}</span></div></div></div>`;
   html += cards;
-  html += `<p class="src">Model strokes use the ${state.P.baseline} strokes-to-hole-out curve after the simulated shots; they compare strategies and will not match your scoring average. Holes without mapped fairways are left out of the totals.</p>`;
+  html += `<p class="src">Model strokes, for the ${esc(playerLabel())} golfer, use the ${curveName(state.P.baseline)} strokes-to-hole-out curve after the simulated shots; they compare strategies and will not match a scoring average. Holes without mapped fairways are left out of the totals.</p>`;
   el.innerHTML = html;
   $$("[data-gohole]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); state.hole = +a.dataset.gohole; store.set("hole", state.hole); setView("hole"); }));
   $$("[data-goview]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); setView(a.dataset.goview); }));
@@ -1158,7 +1229,7 @@ function renderRounds(){
   bind("rFinish", finishRound);
   bind("rAbandon", () => { if (state.confirmAbandon) { const id = state.activeRound; state.rounds = state.rounds.filter(r => r.id !== id); state.activeRound = null; if (state.openRound === id) state.openRound = null; state.confirmAbandon = false; saveRounds(); renderRounds(); toast("Round deleted."); } else { state.confirmAbandon = true; $("#rAbandon").textContent = "Really delete it?"; setTimeout(() => { state.confirmAbandon = false; const b = $("#rAbandon"); if (b) b.textContent = "Abandon"; }, 4000); } });
   bind("rSample", () => { const r = LG.simulateRound(state.course, snapshotP(), (Date.now() % 100000) + 1, { date: today() }); state.rounds.push(r); state.openRound = r.id; saveRounds(); renderRounds(); toast("Sample round added — simulated by the engine, labelled, not yours."); });
-  bind("useMeasured", () => { const m = LG.playerModel(analyses); const ov = state.P.clubsOverride ? state.P.clubsOverride.slice() : []; let n = 0; for (const x of m.measured) { const base = D.clubs.find(c => c.name === x.club); if (!base) continue; let oo = ov.find(q => q.name === x.club); if (!oo) { oo = Object.assign({}, base); ov.push(oo); } const roll = state.P.setting === "firm" ? base.roll_firm : base.roll_soft; oo.carry = Math.max(30, Math.round(x.total - roll)); n++; } if (n) { state.P.clubsOverride = ov; saveP(); toast(`${n} club${n===1?"":"s"} now use your measured totals; Settings → Reset to the model undoes it.`); renderRounds(); } });
+  bind("useMeasured", () => { const m = LG.playerModel(analyses); const ov = state.P.clubsOverride ? state.P.clubsOverride.slice() : []; let n = 0; for (const x of m.measured) { const base = E.clubTable(state.P).find(c => c.name === x.club); if (!base) continue; let oo = ov.find(q => q.name === x.club); if (!oo) { oo = Object.assign({}, base); ov.push(oo); } const roll = state.P.setting === "firm" ? base.roll_firm : base.roll_soft; oo.carry = Math.max(30, Math.round(x.total - roll)); n++; } if (n) { state.P.clubsOverride = ov; saveP(); toast(`${n} club${n===1?"":"s"} now use your measured totals; Settings → Your own clubs → Clear your own clubs undoes it.`); renderRounds(); } });
   $$("[data-open]").forEach(b => b.addEventListener("click", () => { state.openRound = state.openRound === b.dataset.open ? null : b.dataset.open; state.confirmDel = null; renderRounds(); }));
   $$("[data-del]").forEach(b => b.addEventListener("click", () => { const id = b.dataset.del; if (state.confirmDel === id) { state.rounds = state.rounds.filter(r => r.id !== id); if (state.activeRound === id) state.activeRound = null; if (state.openRound === id) state.openRound = null; delete state.ledger[id]; state.confirmDel = null; saveRounds(); renderRounds(); toast("Round deleted."); } else { state.confirmDel = id; renderRounds(); setTimeout(() => { if (state.confirmDel === id) { state.confirmDel = null; if (state.view === "rounds") renderRounds(); } }, 4000); } }));
   bind("rImport", () => { try { let v = JSON.parse($("#roundsJson").value); if (v && v.rounds) v = v.rounds; if (!Array.isArray(v)) throw new Error("not a list"); let added = 0, replaced = 0; for (const r of v) { if (!r || !r.id || !r.course || !course_(r.course)) continue; const i = state.rounds.findIndex(x => x.id === r.id); if (i >= 0) { state.rounds[i] = r; replaced++; } else { state.rounds.push(r); added++; } delete state.ledger[r.id]; } saveRounds(); renderRounds(); toast(`Imported ${added} new round${added===1?"":"s"}${replaced ? `, updated ${replaced}` : ""}.`); } catch (e) { toast("Could not read that as rounds JSON (" + e.message + ")."); } });
@@ -1444,7 +1515,8 @@ function renderAudit(){
 // ---------------- settings ----------------
 function renderSettings(){
   const P = state.P; const el = $("#viewSettings");
-  const clubs = D.clubs.map(c => { const o = (P.clubsOverride||[]).find(x=>x.name===c.name) || {}; return Object.assign({}, c, o); });
+  const clubs = E.clubTable(P).map(c => { const o = (P.clubsOverride||[]).find(x=>x.name===c.name) || {}; return Object.assign({}, c, o); });
+  const six = sixNow();
   el.innerHTML = `
   <section><h3>Today's conditions</h3>
     <label>Wind speed (mph) <input type="number" id="s_wind_mph" min="0" max="40" step="1" value="${P.wind_mph}"></label>
@@ -1455,31 +1527,44 @@ function renderSettings(){
     <label title="Yards the pin sits beside the hole line, as seen from the fairway (− left, + right, 0 on the line). A pin tucked beside sand or water is the short-siding case: the engine's best target moves to the safe side and the pin itself costs more (pipeline/bench_pins.py)">Pin tucked (yd, − left / + right) <input type="number" id="s_pinlat" min="-20" max="20" step="1" value="${+P.pin_lat||0}"></label>
     <p class="help">Wind is a caddie's rule of thumb: ${P.head_pct_per_mph}% of carry per mph into, ${P.tail_pct_per_mph}% per mph with, ${P.cross_yd_per_mph} yd of drift per mph across for a 300-yard shot. Every hole uses its own bearing. The conditions chip at the top can fill the wind and temperature from the current forecast at the course (Open-Meteo's 10-m wind; not in the artifact copy, whose frame refuses the network) — a forecast, not a measurement: the chip's tooltip says when it was taken.</p>
   </section>
-  <section><h3>You</h3>
-    <label>Dispersion scale <input type="range" id="s_disp" min="0.6" max="1.6" step="0.05" value="${P.disp}"> <span class="num" id="s_disp_v">${Math.round(P.disp*100)}%</span></label>
-    <label>Mishit rate <input type="range" id="s_q_miss" min="0.1" max="0.6" step="0.05" value="${P.q_miss}"> <span class="num" id="s_q_miss_v">${Math.round(P.q_miss*100)}%</span></label>
-    <label>Fade bias (right-side stretch) <input type="range" id="s_skew_right" min="0" max="0.6" step="0.05" value="${P.skew_right}"> <span class="num" id="s_skew_v">${Math.round(P.skew_right*100)}%</span></label>
+  <section id="youSec"><h3>You</h3>
+    <label>The golfer Loop prices for <select id="s_player">${PLAYER_ORDER.map(k => `<option value="${k}" ${playerKey()===k?"selected":""}>${D.players[k].label}</option>`).join("")}</select></label>
+    <p class="help">${playerEdited() ? `Edited from the ${esc(D.players[playerKey()].label)} level: choosing a level again puts its numbers back${(P.clubsOverride||[]).length ? " (the clubs you typed below stay on top until you clear them)" : ""}.` : "The level's own numbers, from published data. Change any of the six to make it yours; your own clubs go in the table below."}</p>
+    <div class="six">
+      <label>Driver carry (yd) <input type="number" id="s6_drv" min="120" max="360" step="1" value="${six.drv}"></label>
+      <label>7-iron carry (yd) <input type="number" id="s6_i7" min="70" max="230" step="1" value="${six.i7}"></label>
+      <label>9 drives in 10 within ± (yd) <input type="number" id="s6_w" min="8" max="150" step="1" value="${six.w}"></label>
+      <label>Good shots from 150 yd, long or short ± (yd) <input type="number" id="s6_dc" min="1" max="30" step="0.5" value="${six.dc}"></label>
+      <label>Off-centre strikes, of 100 shots <input type="number" id="s6_q" min="0" max="80" step="1" value="${six.q}"></label>
+      <label>An off-centre strike flies (% shorter) <input type="number" id="s6_ms" min="0" max="60" step="1" value="${six.ms}"></label>
+    </div>
+    <p class="help">The six numbers are the player. The two carries set the club table (the woods and the hybrid on the driver, the irons and wedges on the 7-iron, in the Tour table's proportions). The width is the side-to-side spread of drives (every club spreads by the same share of its carry); the long-or-short number is one standard deviation of a good shot's depth; off-centre strikes are the wider, shorter part of the pattern. For the four levels they come from TrackMan's PGA TOUR averages, Shot Scope's performance averages by handicap and Broadie's Golfmetrics; the 10 and 20 levels' strokes-to-hole-out curves are modelled (pipeline/players, ESTIMATED). Your own launch-monitor numbers beat all of it.</p>
+    <label>Fade or draw (right-side stretch; 0 = straight, the levels' setting) <input type="range" id="s_skew_right" min="0" max="0.6" step="0.05" value="${P.skew_right}"> <span class="num" id="s_skew_v">${Math.round(P.skew_right*100)}%</span></label>
     <label>Home elevation (ft) <input type="number" id="s_home_ft" step="10" value="${P.home_ft}"></label>
-    <label>Short game vs scratch <select id="s_short_game_extra"><option value="0" ${P.short_game_extra==0?"selected":""}>scratch (57% up-and-down)</option><option value="0.2" ${P.short_game_extra==0.2?"selected":""}>+0.2 strokes a chip</option><option value="0.4" ${P.short_game_extra==0.4?"selected":""}>+0.4</option><option value="0.6" ${P.short_game_extra==0.6?"selected":""}>+0.6</option><option value="0.8" ${P.short_game_extra==0.8?"selected":""}>+0.8</option></select></label>
-    <label>Baseline curve <select id="s_baseline"><option value="scratch" ${P.baseline==="scratch"?"selected":""}>scratch amateur</option><option value="tour" ${P.baseline==="tour"?"selected":""}>PGA Tour (Broadie)</option></select></label>
+    <label>Short game against your level <select id="s_short_game_extra"><option value="0" ${P.short_game_extra==0?"selected":""}>as the level's curve</option><option value="0.2" ${P.short_game_extra==0.2?"selected":""}>+0.2 strokes a chip</option><option value="0.4" ${P.short_game_extra==0.4?"selected":""}>+0.4</option><option value="0.6" ${P.short_game_extra==0.6?"selected":""}>+0.6</option><option value="0.8" ${P.short_game_extra==0.8?"selected":""}>+0.8</option></select></label>
+
     <label>Of 100 balls in the desert, played as they lie <input type="number" id="s_desert_play" min="0" max="100" step="5" value="${Math.round(E.desertShares(P)[0]*100)}" inputmode="numeric" style="width:4.5em"></label>
     <label>… unplayable (a stroke and a drop) <input type="number" id="s_desert_unplayable" min="0" max="100" step="5" value="${Math.round(E.desertShares(P)[1]*100)}" inputmode="numeric" style="width:4.5em"></label>
     <label>… lost (stroke and distance) <input type="number" id="s_desert_lost" min="0" max="100" step="5" value="${Math.round(E.desertShares(P)[2]*100)}" inputmode="numeric" style="width:4.5em"></label>
     <p class="help">Where the club's card makes the desert a penalty area or gives a one-stroke drop at the grass line (Cochise, Geronimo, Chiricahua and Outlaw; Talon and Raptor), a ball not played as it lies is a stroke and a drop at the grass line — unplayable and lost cost the same there. Elsewhere the Rules: a drop on desert ground, or stroke and distance.</p>
-    <p class="help">Dispersion at 100% is the model calibrated to Arccos scratch-golfer green hits (83/71/63/47/36% from 100/130/150/200/240 yards on generic greens). On the greens of your nine courses (161 holes: OpenStreetMap's where it maps them, otherwise grown from the pin on in-season USDA NAIP imagery) the same pattern hits 75/63/56/41/32% from those distances (fairway, middle pin; pipeline/audit_model.py), so it is not a 3-handicap calibration and nothing here measures yours yet: your marked rounds will. The baseline curve is the scratch amateur's; strokes gained in Rounds are against it. The short-game setting adds strokes to every chip, pitch and bunker shot inside 50 yards — it is the one number the go/lay-up verdicts turn on. The desert is general area everywhere (the Rules of Golf, no local rule): the three desert numbers are what happens to your desert balls — played as they lie (rough plus 0.4), dropped (a stroke, on desert ground), or lost (stroke and distance, the shot again) — and they are an estimate (60 / 25 / 15 of a hundred) until your marked rounds say otherwise; the three are read as shares, so they need not sum to 100.</p>
+    <details class="adv"><summary style="cursor:pointer;color:var(--ink2);font-size:13.5px;margin:6px 0">Advanced</summary>
+      <label>Strokes-to-hole-out curve <select id="s_baseline">${["tour","scratch","hcp10","hcp20"].filter(b => D.bases[b]).map(b => `<option value="${b}" ${P.baseline===b?"selected":""}>${({tour:"PGA Tour (Broadie)",scratch:"scratch amateur (Arccos figures)",hcp10:"10-handicap (modelled)",hcp20:"20-handicap (modelled)"})[b]}</option>`).join("")}</select></label>
+      <label>Spread multiplier <input type="range" id="s_disp" min="0.6" max="1.6" step="0.05" value="${P.disp}"> <span class="num" id="s_disp_v">${Math.round(P.disp*100)}%</span></label>
+    </details>
+    <p class="help">The levels' patterns are session E's shot mixture fitted to Broadie's Golfmetrics (the tee shot's direction, the greens hit from 100–150 yd in the fairway and how close the shots finish) and to Shot Scope's short-against-long misses; on the generic 26 × 28-yd green the scratch pattern hits 74 % from 100–150 yd. On Loop's own greens the same patterns hit fewer (pipeline/audit_model.py). Strokes gained in Rounds are against your level's curve. The short-game setting adds strokes to every chip, pitch and bunker shot inside 50 yards — the number the go/lay-up verdicts turn on. The three desert numbers are what happens to your desert balls — played as they lie (rough plus 0.4), dropped, or lost — an estimate (60 / 25 / 15 of a hundred) until your marked rounds say otherwise; they are read as shares, so they need not sum to 100.</p>
   </section>
-  <section><h3>Your clubs</h3>
+  <section id="ownClubs"><h3>Your own clubs</h3>
     <div class="tablewrap"><table class="clubs"><thead><tr><th>Club</th><th class="n">Carry</th><th class="n">Roll firm</th><th class="n">Roll soft</th></tr></thead><tbody>
     ${clubs.map(c => `<tr><td>${c.name}</td><td class="n"><input type="number" data-club="${c.name}" data-f="carry" value="${c.carry}"></td><td class="n"><input type="number" data-club="${c.name}" data-f="roll_firm" value="${c.roll_firm}"></td><td class="n"><input type="number" data-club="${c.name}" data-f="roll_soft" value="${c.roll_soft}"></td></tr>`).join("")}
     </tbody></table></div>
-    <p class="help">Carries at sea level and 70°F; Loop adds ${P.alt_rule}% per 1,000 ft of course elevation above home and ${P.temp_pct_per_10f}% per 10°F. <button id="resetClubs" style="padding:2px 8px;font-size:12px">Reset to the model</button></p>
+    <p class="help">Carries at sea level and 70°F; Loop adds ${P.alt_rule}% per 1,000 ft of course elevation above home and ${P.temp_pct_per_10f}% per 10°F. A number typed here replaces the level's for that club. <button id="resetClubs" style="padding:2px 8px;font-size:12px">Clear your own clubs</button></p>
   </section>
   <section><h3>Launch monitor</h3>
     <textarea id="lmPaste" placeholder="Paste one club per line: club, carry, total  — or  club, carry, total, offline σ (yd), distance σ (yd)
 Driver, 302, 328
 3-wood, 274, 296, 15, 10"></textarea>
     <div style="margin-top:8px"><button id="lmApply">Use these numbers</button> <span class="help" style="display:inline">Carry and roll replace the table; a σ pair also replaces that club's dispersion. Names must match the table.</span></div>
-    <p class="help">${P.clubsOverride?`Using your table for ${P.clubsOverride.length} clubs.`:"Using the model's club table."}</p>
+    <p class="help">${P.clubsOverride?`Using your numbers for ${P.clubsOverride.length} club${P.clubsOverride.length===1?"":"s"}, the ${esc(D.players[playerKey()].label)} level's for the rest.`:`Using the ${esc(D.players[playerKey()].label)} level's club table.`}</p>
   </section>
   <section><h3>Corrections</h3>
     <p class="help">Greens you moved with <b>Fix green</b>, as text for the rebuild: paste into <code>pipeline/overrides.json</code> (merge by course and hole) and run <code>run_all.py</code>; the aerial is then re-framed on the right green and the yardage book's pin can be fixed from the same numbers.</p>
@@ -1497,11 +1582,24 @@ Driver, 302, 328
   { const e = $("#s_oob"); if (e) e.addEventListener("change", () => { state.P.oob = e.checked; saveP(); renderSettings(); }); }   // out of bounds priced (session P)
   const bind = (id, key, parse=parseFloat) => { const e = $("#"+id); e.addEventListener("change", () => { state.P[key] = parse(e.value); if (key==="aim_max") state.P.aim_min = -state.P.aim_max; saveP(); renderSettings(); }); };
   bind("s_wind_mph","wind_mph"); bind("s_wind_from","wind_from"); bind("s_temp_f","temp_f"); bind("s_setting","setting",v=>v); bind("s_pin","pin",v=>v); bind("s_pinlat","pin_lat",v=>Math.max(-20,Math.min(20,parseFloat(v)||0))); bind("s_home_ft","home_ft"); bind("s_baseline","baseline",v=>v); bind("s_short_game_extra","short_game_extra"); bind("s_desert_play","desert_play",v=>Math.max(0,Math.min(100,parseFloat(v)||0))/100); bind("s_desert_unplayable","desert_unplayable",v=>Math.max(0,Math.min(100,parseFloat(v)||0))/100); bind("s_desert_lost","desert_lost",v=>Math.max(0,Math.min(100,parseFloat(v)||0))/100); bind("s_n","n",v=>parseInt(v,10)); bind("s_aim_max","aim_max",v=>parseInt(v,10));
-  for (const [id,key,disp] of [["s_disp","disp","s_disp_v"],["s_q_miss","q_miss","s_q_miss_v"],["s_skew_right","skew_right","s_skew_v"]]) { const e=$("#"+id); e.addEventListener("input", ()=>{ $("#"+disp).textContent = Math.round(e.value*100)+"%"; }); e.addEventListener("change", ()=>{ state.P[key]=parseFloat(e.value); saveP(); }); }
-  $$(".clubs input").forEach(i => i.addEventListener("change", () => { const ov = state.P.clubsOverride ? state.P.clubsOverride.slice() : []; let o = ov.find(x=>x.name===i.dataset.club); if (!o) { const base = D.clubs.find(c=>c.name===i.dataset.club); o = Object.assign({}, base); ov.push(o); } o[i.dataset.f] = parseFloat(i.value); state.P.clubsOverride = ov; saveP(); }));
+  $("#s_player").addEventListener("change", ev => choosePlayer(ev.target.value));
+  const scale1 = (c, k) => { if (c.carry != null) c.carry = Math.round(c.carry * k); if (c.roll_firm != null) c.roll_firm = Math.round(c.roll_firm * k); if (c.roll_soft != null) c.roll_soft = Math.max(1, Math.round(c.roll_soft * k)); };
+  const scaleClubs = (pick, k) => { const tab = JSON.parse(JSON.stringify(E.clubTable(state.P))); for (const c of tab) if (pick(c.name)) scale1(c, k); state.P.clubs = tab;
+    if (state.P.clubsOverride) state.P.clubsOverride = state.P.clubsOverride.map(o => { o = Object.assign({}, o); if (pick(o.name)) scale1(o, k); return o; }); };
+  const six6 = (id, f) => $("#"+id).addEventListener("change", ev => { if (!ev.target.isConnected) return;   // a replaced field's late event
+    const v = parseFloat(ev.target.value); if (!(v > 0) && !(v === 0 && /s6_(q|ms)/.test(id))) { renderSettings(); return; } f(v, sixNow()); saveP(); renderSettings(); });
+  six6("s6_drv", (v, now) => { if (v !== now.drv) scaleClubs(n => WOODS.has(n), v / now.drv); });
+  six6("s6_i7", (v, now) => { if (v !== now.i7) scaleClubs(n => !WOODS.has(n), v / now.i7); });
+  six6("s6_w", (v, now) => { if (v === now.w) return; const k = (v / (now.drv * width90(1, state.P.q_miss, state.P.miss_lat_mult))) / now.lat;   // every club's spread by the same factor
+    state.P.lat_pct = Math.round(state.P.lat_pct * k * 1e4) / 1e4; if (state.P.clubsOverride) state.P.clubsOverride = state.P.clubsOverride.map(o => o.lat_pct != null ? Object.assign({}, o, { lat_pct: Math.round(o.lat_pct * k * 1e4) / 1e4 }) : o); });
+  six6("s6_dc", v => { state.P.dist_pct = Math.round(v / 150 * 1e4) / 1e4; });
+  six6("s6_q", v => { state.P.q_miss = Math.max(0, Math.min(0.8, v / 100)); });
+  six6("s6_ms", v => { state.P.miss_short_pct = Math.max(0, Math.min(0.6, v / 100)); });
+  for (const [id,key,disp] of [["s_disp","disp","s_disp_v"],["s_skew_right","skew_right","s_skew_v"]]) { const e=$("#"+id); e.addEventListener("input", ()=>{ $("#"+disp).textContent = Math.round(e.value*100)+"%"; }); e.addEventListener("change", ()=>{ state.P[key]=parseFloat(e.value); saveP(); }); }
+  $$(".clubs input").forEach(i => i.addEventListener("change", () => { const ov = state.P.clubsOverride ? state.P.clubsOverride.slice() : []; let o = ov.find(x=>x.name===i.dataset.club); if (!o) { const base = E.clubTable(state.P).find(c=>c.name===i.dataset.club); o = Object.assign({}, base); ov.push(o); } o[i.dataset.f] = parseFloat(i.value); state.P.clubsOverride = ov; saveP(); }));
   $("#resetClubs").addEventListener("click", () => { delete state.P.clubsOverride; saveP(); renderSettings(); });
   $("#lmApply").addEventListener("click", () => { const lines = $("#lmPaste").value.split(/\n+/).map(l=>l.trim()).filter(Boolean); const ov = state.P.clubsOverride ? state.P.clubsOverride.slice() : []; let n=0, bad=[];
-    for (const ln of lines) { const parts = ln.split(/[,\t;]+/).map(s=>s.trim()); const name = D.clubs.find(c=>c.name.toLowerCase()===parts[0].toLowerCase().replace(/^3w$/,"3-wood").replace(/^(\d)i$/,"$1-iron").replace(/^d(river)?$/,"driver"));
+    for (const ln of lines) { const parts = ln.split(/[,\t;]+/).map(s=>s.trim()); const name = E.clubTable(state.P).find(c=>c.name.toLowerCase()===parts[0].toLowerCase().replace(/^3w$/,"3-wood").replace(/^(\d)i$/,"$1-iron").replace(/^d(river)?$/,"driver"));
       if (!name || parts.length<3 || isNaN(+parts[1]) || isNaN(+parts[2])) { bad.push(ln); continue; }
       let o = ov.find(x=>x.name===name.name); if (!o) { o = Object.assign({}, name); ov.push(o); }
       o.carry = +parts[1]; const roll = Math.max(0, +parts[2] - +parts[1]); o.roll_firm = Math.round(roll); o.roll_soft = Math.round(roll*0.4);
@@ -1512,7 +1610,7 @@ Driver, 302, 328
   $("#resetAll").addEventListener("click", () => { state.P = Object.assign({}, D.defaults); saveP(); renderSettings(); toast("Settings reset."); });
 }
 function correctionsJson(){ const out = {}; for (const k in state.overrides) { const [ck, hn] = k.split(":"); const o = state.overrides[k]; (out[ck] = out[ck] || {})[hn] = { green_latlon: o.latlon, note: "moved in Loop on " + new Date().toISOString().slice(0,10) }; } return out; }
-function saveP(){ const keep = {}; for (const k in state.P) if (JSON.stringify(state.P[k]) !== JSON.stringify(D.defaults[k])) keep[k] = state.P[k]; store.set("P", keep); state.results = {}; renderHeader(); if (state.view==="hole") renderHole(); startBackground(); }
+function saveP(){ const keep = {}; for (const k in state.P) if (JSON.stringify(state.P[k]) !== JSON.stringify(D.defaults[k])) keep[k] = state.P[k]; store.set("P", keep); state.results = {}; SW.setClubs(clubsAsPlayed()); renderHeader(); if (state.view==="hole") renderHole(); startBackground(); }
 // ---------------- views ----------------
 function setView(v){ state.view = v; for (const id of ["hole","round","rounds","swing","audit","settings"]) $("#view"+id[0].toUpperCase()+id.slice(1)).hidden = id!==v; renderHeader();
   if (v==="hole") renderHole(); if (v==="round") renderRound(); if (v==="rounds") renderRounds(); if (v==="swing") renderSwing(); if (v==="audit") renderAudit(); if (v==="settings") renderSettings(); if (v==="round"||v==="audit") startBackground(); window.scrollTo(0,0); }
@@ -1544,7 +1642,13 @@ document.addEventListener("keydown", ev => { if (ev.target.matches("input,select
 if (IN_ARTIFACT || !navigator.geolocation) { $("#gpsBtn").style.display = "none"; $("#followBtn").style.display = "none"; }
 else if (store.get("follow", false)) setTimeout(() => setFollow(true, true), 800);   // the phone was following when it was last closed
 if (IN_ARTIFACT || typeof fetch !== "function") { $("#q_forecast").style.display = "none"; }   // the artifact frame refuses fetch
+$("#whoChip").addEventListener("click", openAsk);
+$("#askSkip").addEventListener("click", () => { closeAsk(); toast(`Pricing every shot for: ${D.players[playerKey()].label}. Settings → You changes it.`); });
+$("#askOwn").addEventListener("click", () => { closeAsk(); setView("settings"); setTimeout(() => { const t = $("#ownClubs"); if (t) t.scrollIntoView({ block: "start" }); }, 30); });
+$("#askPlayer").addEventListener("click", ev => { if (ev.target === $("#askPlayer")) closeAsk(); });
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !$("#askPlayer").hidden) closeAsk(); });
 renderHeader(); setView("hole"); startBackground();
+if (!store.get("playerAsked", false)) openAsk();   // one question on first open: which golfer are you?
 })();
 </script>
 <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(()=>{}); navigator.serviceWorker.addEventListener("message", e => { if (e.data && e.data.type === "loop-reload") location.reload(); }); }</script>
