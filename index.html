@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from public data: lidar elevation, mapped surfaces, the club's own card and your dispersion.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="0501b4975a">
+<meta name="loop-build" content="4b24aa7ef3">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -292,6 +292,24 @@ details.more>summary::marker{color:var(--mute)}
 .notelist li{margin:2px 0;overflow-wrap:anywhere}
 @media (pointer:coarse){.noterow button{padding:9px 14px;font-size:13.5px}.noterow textarea,#notesJson{font-size:16px}}
 @media (pointer:coarse){.pingrid{grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,30px)}.pingrid button{font-size:14px}}
+/* A user's pass at phone width (session Q's eighth lane): a select never wider than its row (the header's course at 360 px, Start a round
+   on, the swing view's metric), your own clubs' inputs at their own width (the settings' 110-px rule had won), a settings select as wide as
+   its words, the tables' short cells on one line, a white swatch with an edge, the elevation profile's words outside its stretched drawing */
+@media (max-width:560px){select.course{flex:1 1 100%;min-width:0}}
+.rounds .banner label,.swingv .row label{min-width:0;max-width:100%}
+.rounds .banner select,.swingv select{max-width:100%}
+.settings select{width:auto;min-width:110px}
+.settings .clubs td input{width:58px;padding:3px 6px}
+@media (max-width:560px){.settings .clubs td input{width:50px;padding:3px 4px}}
+.opts th,.opts td{white-space:nowrap}.opts td:nth-child(6){white-space:normal}
+td.nw{white-space:nowrap}
+.maplegend span.sw-edge::before{box-shadow:inset 0 0 0 1px #999}
+.maplegend span.sw-dash::before{outline:1px dashed #888;outline-offset:-1px}
+.oddsl span[data-k=oob]::before{box-shadow:inset 0 0 0 1px var(--mute)}
+.odds i[title^="oob "]{box-shadow:inset 0 0 0 1px rgba(0,0,0,.28)}
+.profbox{position:relative}
+.profcap{display:flex;justify-content:space-between;gap:12px;padding:0 4.7%;font:11px/1.3 var(--num);color:var(--mute)}.profcap.top{justify-content:flex-end;margin-top:4px}
+.profbox .pl{position:absolute;font:11px/1.1 var(--num);color:var(--engine);white-space:nowrap;pointer-events:none;transform:translate(-50%,-100%);text-shadow:0 0 2px var(--paper),0 0 2px var(--paper),0 0 3px var(--paper)}
 .pocket{display:none}
 .ybook{display:none}   /* the yardage book (session P): built on demand, shown only when it is what is being printed */
 @media print{
@@ -312,7 +330,7 @@ details.more>summary::marker{color:var(--mute)}
   .ybhead b{font:700 12px var(--num)}
   .ybrow{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   .ybh{min-width:0;break-inside:avoid}
-  .ybmapbox{height:6.7in;display:flex;justify-content:center;align-items:flex-start}
+  .ybmapbox{height:6.3in;display:flex;justify-content:center;align-items:flex-start}   /* 6.3 + 2.8 + a two-line head and the foot: 9.88 in, under the 10.0 a Letter page leaves at 0.5-in margins (session Q; 6.7 spilled Geronimo even at 0.4) */
   .ybmapbox canvas{max-width:100%;max-height:100%;width:auto;height:auto;border:1px solid #000}
   .ybtt{font:700 16px var(--num);margin:5px 0 3px;display:flex;gap:8px;align-items:baseline}
   .ybtt .sub{font:600 9.5px var(--font);color:#222}
@@ -325,7 +343,7 @@ details.more>summary::marker{color:var(--mute)}
   .ybtxt .ybnote{overflow-wrap:anywhere;border-bottom:1px solid #aaa;padding-bottom:1px}
   /* a hole with a note (session Q): its map gives the text box the note's height beyond the three ruled lines (--shrink, from bookShrink),
      so the note is never cut off and the column is never taller than the same hole without a note */
-  .ybh.hasnote .ybmapbox{height:calc(6.7in - var(--shrink, 0px))}
+  .ybh.hasnote .ybmapbox{height:calc(6.3in - var(--shrink, 0px))}
   .ybh.hasnote .ybtxt{max-height:calc(2.8in + var(--shrink, 0px))}
   .ybfoot{font-size:7.5px;color:#444;margin-top:5px;border-top:1px solid #999;padding-top:2px}
 }
@@ -393,8 +411,8 @@ details.more>summary::marker{color:var(--mute)}
       </div>
       <div id="attrib" class="maplegend" style="padding-top:4px;padding-bottom:0" hidden><span style="--c:transparent">Imagery © Esri, Maxar, Earthstar Geographics and the GIS user community · map data © OpenStreetMap contributors</span></div>
       <div class="maplegend">
-        <span style="--c:var(--engine)">engine line &amp; window</span><span style="--c:#ffffff;border:1px solid #999">hole line</span>
-        <span style="--c:var(--fw)">fairway</span><span style="--c:var(--rough)">rough</span><span style="--c:var(--sand)">sand</span><span style="--c:var(--water)">water</span><span id="legDesert" style="--c:var(--desert)">desert</span><span id="legOob" style="--c:#ffffff;border:1px dashed #888" hidden>out of bounds (white stakes)</span>
+        <span style="--c:var(--engine)">engine line &amp; window</span><span class="sw-edge" style="--c:#ffffff">hole line</span>
+        <span style="--c:var(--fw)">fairway</span><span style="--c:var(--rough)">rough</span><span style="--c:var(--sand)">sand</span><span style="--c:var(--water)">water</span><span id="legDesert" style="--c:var(--desert)">desert</span><span id="legOob" class="sw-dash" style="--c:#ffffff" hidden>out of bounds (white stakes)</span>
       </div>
     </div>
     <div class="card" id="holeCard"></div>
@@ -522,7 +540,7 @@ function distLine(c, h, r, o){
     const ang = o.club === "Driver" ? P.angles.driver : (o.club === "3-wood" || o.club === "Hybrid") ? P.angles.wood : P.angles.long, k = 1 / Math.tan(ang * Math.PI / 180);
     let d = o.carry, zl = z0; for (let i = 0; i < 2; i++) { zl = E.zAt(H, Math.cos(a) * d * YD, Math.sin(a) * d * YD); d = o.carry + k * (z0 - zl) / 3; }   // the engine's rule, twice (shoot)
     const dz = z0 - zl;
-    if (Math.abs(dz) >= 5) t += ` This ${o.club === "Driver" ? "drive" : "shot"} comes down ${Math.round(Math.abs(dz))} ft ${dz > 0 ? "below" : "above"} the tee, which ${dz > 0 ? "adds" : "takes"} about ${Math.round(Math.abs(d - o.carry))} yd ${dz > 0 ? "to" : "off"} the carry (${(k / 3).toFixed(2)} yd a foot at a ${ang}° descent), and finishes about ${Math.round(ly)} out; the roll does not change with the slope.`; }
+    if (Math.abs(dz) >= 5) t += ` This ${o.club === "Driver" ? "drive" : "shot"} ${dz > 0 ? "comes down" : "lands"} ${Math.round(Math.abs(dz))} ft ${dz > 0 ? "below" : "above"} the tee, which ${dz > 0 ? "adds" : "takes"} about ${Math.round(Math.abs(d - o.carry))} yd ${dz > 0 ? "to" : "off"} the carry (${(k / 3).toFixed(2)} yd a foot at a ${ang}° descent), and finishes about ${Math.round(ly)} out; the roll does not change with the slope.`; }
   const m = bagMix(); if (m) t += ` <span id="bagNote" style="color:var(--engine)">${bagText(m)} — Settings → Your own clubs.</span>`;
   return t; }
 function phash(){ const p = state.P; return JSON.stringify([p.player||null,p.clubs||null,p.miss_short_pct,p.miss_lat_mult,p.miss_dist_mult,p.setting,p.baseline,p.disp,p.q_miss,p.skew_right,p.wind_mph,p.wind_from,p.temp_f,p.pin,p.pin_lat||0,p.alt_rule,p.home_ft,p.lat_pct,p.dist_pct,p.clubsOverride||null,p.desert_play,p.desert_unplayable,p.desert_lost,p.desert_drop_extra,p.scrub_extra,p.short_game_extra||0,p.n,!!p.oob,!!p.own_ground]); }
@@ -553,6 +571,21 @@ function landingWindow(c, h, r){
   const w0 = o.window[0], w1 = o.window[1];
   return { d, aL, w0, w1, l: aimYd(w0, d), r: aimYd(w1, d), width: arc(w0, w1), fwW, aim: aimYd(o.best.aim, d), step: arc(0, state.P.aim_step || 2), fw, lieL: lie(w0), lieR: lie(w1) };
 }
+// A provisional ball (session Q, OPPORTUNITIES 51): how often the engine's tee shot (a par 3's too) finishes out of bounds, or lost in a desert
+// that is general area (the player's lost share of desert balls, Settings → You) — never where the card makes the desert a penalty area, in
+// water, or under a parkland course's trees (the engine plays them as they lie): the Rules give no provisional for a ball that can only be in a
+// penalty area (Rule 18.3a). The engine's odds count desert and scrub together; the landing sample's own lies split them (scrub is played,
+// never lost). Shown from 5 in 100, whole numbers that add up.
+const PROV_MIN = 5;
+function provisional(c, h, b){
+  if (!b || !b.odds) return null; const ob = Math.round((b.odds.oob || 0) * 100);
+  const lostShare = isParkland(c) || h.desert_rule === "penalty_area" ? 0 : E.desertShares(state.P)[2];
+  let des = 0; if (lostShare > 0 && b.odds.desert) { const sm = b.sample || []; const nd = sm.filter(x => x[2] === LIE.DESERT).length, ns = sm.filter(x => x[2] === LIE.SCRUB).length; des = nd + ns ? b.odds.desert * nd / (nd + ns) : b.odds.desert; }
+  const lost = Math.round(des * lostShare * 100); return { ob, lost, n: ob + lost, show: ob + lost >= PROV_MIN };
+}
+function provWords(pv){ return pv.lost && pv.ob ? "out of bounds or lost" : pv.lost ? "lost" : "out of bounds"; }
+function provSpan(c, h, b){ const pv = provisional(c, h, b); return pv && pv.show ? `<span class="cost" id="cbProv">${pv.n} in 100 ${provWords(pv)}: a provisional if in doubt</span>` : ""; }   // the caddie line, in the engine's red
+function provRow(c, h, b){ const pv = provisional(c, h, b); return pv && pv.show ? `<div id="provRow"><span>A provisional ball</span><span><b>${pv.n}</b> in 100 of these tee shots finish ${provWords(pv)}${pv.ob && pv.lost ? ` (${pv.ob} out, ${pv.lost} lost in the ${dW(c)})` : pv.lost ? ` in the ${dW(c)}` : ""}: if yours might be, play a provisional before you walk forward (Rule 18.3) — the price above already counts the stroke and distance</span></div>` : ""; }   // the card: the counts and the Rule
 function aimText(a, atYd){ if (a===0) return "straight at the pin line"; const yd = atYd ? Math.round(Math.abs(aimYd(a, atYd))) : 0; return Math.abs(a)+"° "+(a<0?"left":"right")+(yd?` — about ${yd} yd ${a<0?"left":"right"} of the pin line at ${Math.round(atYd)}`:" of the pin line"); }
 function aimShort(a){ return a===0? "0°" : Math.abs(a)+"° "+(a<0?"L":"R"); }
 function nth(n){ const v = n % 100; return n + (v >= 11 && v <= 13 ? "th" : ({1:"st",2:"nd",3:"rd"})[n % 10] || "th"); }
@@ -589,7 +622,18 @@ function pinCells(h){
 // ---------------- results (cached per course × settings) ----------------
 function resultKey(c){ return c.key+"|"+phash(); }
 function getResults(c){ const k = resultKey(c); if (!state.results[k]) state.results[k] = { holes: {}, done: 0 }; return state.results[k]; }
-function compute(c, h, n){ const P = holeP(c, h); const r = E.runHole(c, h, P, { n }); if (r.kind==="tee" && h.par===5 && r.landing && r.approach && r.approach.from >= 160) r.goLay = E.goVsLay(h, r.landing, P, altf(c)); r.pinKey = pinKey(c, h); return r; }
+function compute(c, h, n){ const P = holeP(c, h); const r = E.runHole(c, h, P, { n }); const ml = typicalLie(r);
+  if (ml != null) { const a2 = E.approach(h, r.landing, P, altf(c), { n: 600, fromLie: ml }); if (a2) { a2.pointLie = r.approach.fromLie; r.approach = a2; } }
+  if (r.kind==="tee" && h.par===5 && r.landing && r.approach && r.approach.from >= 160) r.goLay = E.goVsLay(h, r.landing, P, altf(c), ml != null ? { fromLie: ml } : undefined); r.pinKey = pinKey(c, h); return r; }
+// The approach the card shows is played from where the tee shots finish (session Q's eighth lane). The engine prices it from the median landing
+// point, and on a few holes that one point sits in a bunker, the rough or another hole's tee while most tee shots finish elsewhere (Cochise 1:
+// 92 in 100 on the fairway, the point in a fairway bunker, so the card said "Then SW from the sand"; TPC 10 "from the tee"). Where the card's
+// own odds put the most tee shots on the fairway or in the rough, the point keeps its place and takes that lie — the approach's club, odds and
+// price, and a par 5's go or lay up, from it.
+function typicalLie(r){ if (!r || r.kind !== "tee" || !r.approach || !r.landing) return null; const od = r.options[0].best.odds || {};
+  const top = ["fairway", "rough", "green", "sand", "water", "desert", "oob"].reduce((a, k) => (od[k] || 0) > (od[a] || 0) ? k : a, "fairway");
+  const ml = top === "fairway" ? LIE.FAIRWAY : top === "rough" ? LIE.ROUGH : null;
+  return ml != null && r.approach.fromLie !== ml ? ml : null; }
 function ensureHole(c, h){ const R = getResults(c); const k = pinKey(c, h); if (!R.holes[h.hole] || R.holes[h.hole].n < 1500 || R.holes[h.hole].pinKey !== k) { R.holes[h.hole] = compute(c, h, 1500); R.holes[h.hole].n = 1500; } return R.holes[h.hole]; }
 function computeCourse(c, onProgress){
   const R = getResults(c); if (R.busy) return; R.busy = true; const key = resultKey(c);
@@ -687,7 +731,7 @@ function drawMap(h, r){
     const ovr = E.overrideFor(h); const hline = ovr ? h.line.slice(0, -1).concat([ovr.pin]) : h.line; const Hd = E.decodeHole(h); E.applyPin(Hd, holeP(c, h)); const pinPt = Hd.pin.slice();   // the pin of the day (front / middle / back, tucked; the hole's own from the pin sheet)
     ctx.save(); ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=2; ctx.setLineDash([]); ctx.beginPath(); hline.forEach((p,i)=>{ const [a,b]=px(p[0],p[1]); i?ctx.lineTo(a,b):ctx.moveTo(a,b); }); ctx.stroke(); ctx.restore();
     // engine pick: aim window fan + line + landing cloud
-    cv.dataset.window = "";
+    cv.dataset.window = ""; cv.dataset.winbox = "";
     if (r && r.kind==="tee") {
       const o = r.options[0]; const carryM = o.best.rem!=null ? Math.hypot(r.landing[0], r.landing[1]) : o.total*YD;
       const fan = (a0,a1,col) => { ctx.beginPath(); const [tx,ty]=px(0,0); ctx.moveTo(tx,ty); for (let a=a0;a<=a1;a+=1){ const rad=a*Math.PI/180; const [qx,qy]=px(Math.cos(rad)*carryM, Math.sin(rad)*carryM); ctx.lineTo(qx,qy);} ctx.closePath(); ctx.fillStyle=col; ctx.fill(); };
@@ -697,7 +741,7 @@ function drawMap(h, r){
       for (const s of o.best.sample) { const [a,b]=px(s[0],s[1]); ctx.fillStyle = LIECOL[s[2]] || "#fff"; ctx.beginPath(); ctx.arc(a,b,2.6,0,7); ctx.fill(); ctx.strokeStyle="rgba(0,0,0,.5)"; ctx.lineWidth=.6; ctx.stroke(); }
       // the window at the landing distance (session O, slice 4): a red band across the hole where the window's aims reach the median landing,
       // drawn over the tee shot's cloud, one label above its middle (its edges in yards off the pin line, its width)
-      const LW = landingWindow(c, h, r);
+      const LW = landingWindow(c, h, r); let winLab = null;
       cv.dataset.window = LW ? JSON.stringify({ d: LW.d, aL: LW.aL, w0: LW.w0, w1: LW.w1, l: +LW.l.toFixed(1), r: +LW.r.toFixed(1), width: +LW.width.toFixed(1), fwW: LW.fwW == null ? null : +LW.fwW.toFixed(1), fw: LW.fw ? LW.fw.map(v => +v.toFixed(1)) : null, lieL: LW.lieL, lieR: LW.lieR }) : "";
       if (LW) { const rM = LW.d * YD; const at = (a, rr) => { const t = a * Math.PI / 180; return px(Math.cos(t) * rr, Math.sin(t) * rr); };
         const arcAt = (a0, a1) => { ctx.beginPath(); for (let a = a0, i = 0; a <= a1 + 1e-9; a += 0.25, i++) { const [qx, qy] = at(a, rM); i ? ctx.lineTo(qx, qy) : ctx.moveTo(qx, qy); } };
@@ -709,11 +753,13 @@ function drawMap(h, r){
         ctx.font = "bold 12px " + getComputedStyle(document.body).getPropertyValue("--num"); ctx.textBaseline = "middle";
         const txt = LW.w1 > LW.w0 ? `window ${sideYd(LW.l, true)} – ${sideYd(LW.r, true)} · ${Math.round(LW.width)} yd` : `one aim · ${sideYd(LW.l, true)}`;
         const [mx, my] = at((LW.w0 + LW.w1) / 2, rM + 2 * k); const tw = ctx.measureText(txt).width + 10; const x = Math.max(2, Math.min(cv.width - 2 - tw, mx - tw / 2)), y = Math.max(11, my - 6);
-        ctx.fillStyle = "rgba(0,0,0,.66)"; ctx.fillRect(x, y - 9, tw, 18); ctx.fillStyle = "#fff"; ctx.fillText(txt, x + 5, y + 1);
+        winLab = { txt, x, y, tw, font: ctx.font };   // drawn below, after the approach's line and cloud (session Q)
         ctx.restore(); }
       // approach landing cloud (from the median landing point)
       if (r.approach && r.approach.best && r.approach.best.sample) { const [lx,ly]=px(r.landing[0],r.landing[1]); ctx.save(); ctx.strokeStyle="rgba(200,16,46,.9)"; ctx.setLineDash([6,5]); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(lx,ly); const [qx,qy]=px(pinPt[0],pinPt[1]); ctx.lineTo(qx,qy); ctx.stroke(); ctx.restore();
         for (const s of r.approach.best.sample) { const [a,b]=px(s[0],s[1]); ctx.fillStyle = LIECOL[s[2]] || "#fff"; ctx.beginPath(); ctx.arc(a,b,2,0,7); ctx.fill(); } }
+      if (winLab) { ctx.save(); ctx.font = winLab.font; ctx.textBaseline = "middle"; ctx.fillStyle = "rgba(0,0,0,.78)"; ctx.fillRect(winLab.x, winLab.y - 9, winLab.tw, 18); ctx.fillStyle = "#fff"; ctx.fillText(winLab.txt, winLab.x + 5, winLab.y + 1); ctx.restore();
+        cv.dataset.winbox = JSON.stringify([Math.round(winLab.x), Math.round(winLab.y - 9), Math.round(winLab.tw), 18]); }
     }
     if (r && r.kind==="par3" && r.approach.best && r.approach.best.sample) { const [tx,ty]=px(0,0); const [qx,qy]=px(pinPt[0],pinPt[1]); ctx.save(); ctx.strokeStyle="#c8102e"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(qx,qy); ctx.stroke(); ctx.restore();
       for (const s of r.approach.best.sample) { const [a,b]=px(s[0],s[1]); ctx.fillStyle = LIECOL[s[2]] || "#fff"; ctx.beginPath(); ctx.arc(a,b,2.4,0,7); ctx.fill(); ctx.strokeStyle="rgba(0,0,0,.5)"; ctx.lineWidth=.6; ctx.stroke(); } }
@@ -731,7 +777,7 @@ function drawMap(h, r){
     const [tx,ty]=px(0,0); ctx.fillStyle="#fff"; ctx.strokeStyle="#17191c"; ctx.beginPath(); ctx.rect(tx-5,ty-5,10,10); ctx.fill(); ctx.stroke(); ctx.restore();
     // landing label (median) for the engine pick
     if (r && r.kind==="tee" && r.landing) { const [lx,ly]=px(r.landing[0],r.landing[1]); ctx.save(); ctx.fillStyle="#c8102e"; ctx.beginPath(); ctx.arc(lx,ly,5,0,7); ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=1.5; ctx.stroke();
-      const lab = Math.round(Math.hypot(r.landing[0], r.landing[1])/YD)+" · "+Math.round(r.options[0].best.rem)+" in"; ctx.font="bold 12px "+getComputedStyle(document.body).getPropertyValue("--num"); const tw = ctx.measureText(lab).width; ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillRect(lx+9, ly+7, tw+10, 18); ctx.fillStyle="#fff"; ctx.fillText(lab, lx+14, ly+20); ctx.restore(); }   // under the window's band (session O, slice 4)
+      const lab = Math.round(Math.hypot(r.landing[0], r.landing[1])/YD)+" · "+Math.round(r.options[0].best.rem)+" in"; ctx.font="bold 12px "+getComputedStyle(document.body).getPropertyValue("--num"); const tw = ctx.measureText(lab).width; ctx.fillStyle="rgba(0,0,0,.72)"; ctx.fillRect(lx+9, ly+7, tw+10, 18); ctx.fillStyle="#fff"; ctx.fillText(lab, lx+14, ly+20); ctx.restore(); }   // under the window's band (session O, slice 4)
     // wind arrow (where the wind blows TO, in the frame): compass of the frame's +x is the hole bearing
     if (state.P.wind_mph > 0) { const b = (h.bearing||0); const toDeg = (state.P.wind_from + 180 - b); const rad = toDeg*Math.PI/180; const cx = cv.width-30, cy = 34; ctx.save(); ctx.translate(cx, cy); ctx.rotate(rad); ctx.strokeStyle="#9fe0ff"; ctx.fillStyle="#9fe0ff"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(0,14); ctx.lineTo(0,-12); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(6,-6); ctx.lineTo(-6,-6); ctx.fill(); ctx.restore(); ctx.save(); ctx.fillStyle="#9fe0ff"; ctx.font="bold 11px sans-serif"; ctx.textAlign="center"; ctx.fillText(state.P.wind_mph+" mph", cx, cy+30); ctx.restore(); }
     // north arrow + scale
@@ -1019,9 +1065,9 @@ function renderCallbar(c, h, r){
   else if (r && r.kind === "tee") { const o = r.options[0], b = o.best, A = r.approach;
     const landYd = r.landing ? Math.hypot(r.landing[0], r.landing[1]) / YD : o.total; const offYd = b.aim ? Math.round(Math.abs(aimYd(b.aim, landYd))) : 0; const LW = landingWindow(c, h, r);
     html = `<div class="l1"><span class="club">${o.club}</span><span class="aim">${b.aim === 0 ? "straight at the pin line" : `${Math.abs(b.aim)}° ${b.aim < 0 ? "left" : "right"}${offYd ? ` (${offYd} yd at ${Math.round(landYd)})` : ""}`}</span><span class="E">${fmt(r.E)}<small>strokes</small></span></div>
-      <div class="l2"><span>${Math.round(o.total)} total · leaves ${Math.round(b.rem)}${A && A.best ? ` → ${A.club}, on ${pct(A.best.odds.green)}` : ""}</span>${LW ? `<span class="muted" id="cbWindow">window ${LW.w1 > LW.w0 ? sideYd(LW.l, true) + " – " + sideYd(LW.r, true) : sideYd(LW.l, true) + " only"}</span>` : ""}${sheetPin(c, h) ? `<span class="muted">pin ${pinWords(sheetPin(c, h))}</span>` : ""}${r.goLay && r.goLay.delta != null && r.goLay.go.best ? `<span class="${r.goLay.delta > 0 ? "cost" : ""}">${r.goLay.delta > 0 ? "go for it — saves " + fmt(r.goLay.delta) : "lay up — saves " + fmt(-r.goLay.delta)}</span>` : ""}</div>`; }
+      <div class="l2"><span>${Math.round(landYd)} out · leaves ${Math.round(b.rem)}${A && A.best ? ` → ${A.club}, on ${pct(A.best.odds.green)}` : ""}</span>${LW ? `<span class="muted" id="cbWindow">window ${LW.w1 > LW.w0 ? sideYd(LW.l, true) + " – " + sideYd(LW.r, true) : sideYd(LW.l, true) + " only"}</span>` : ""}${provSpan(c, h, b)}${sheetPin(c, h) ? `<span class="muted">pin ${pinWords(sheetPin(c, h))}</span>` : ""}${r.goLay && r.goLay.delta != null && r.goLay.go.best ? `<span class="${r.goLay.delta > 0 ? "cost" : ""}">${r.goLay.delta > 0 ? "go for it — saves " + fmt(r.goLay.delta) : "lay up — saves " + fmt(-r.goLay.delta)}</span>` : ""}</div>`; }
   else if (r && r.kind === "par3") { const a = r.approach;
-    html = `<div class="l1"><span class="club">${a.club}</span><span class="aim">plays ${Math.round(a.plays)} (${sgn(a.dz, 0)} ft)</span><span class="E">${fmt(r.E)}<small>strokes</small></span></div><div class="l2">${sheetPin(c, h) ? `<span class="muted">pin ${pinWords(sheetPin(c, h))}</span>` : ""}${a.best ? oddsShort(a.best.odds) + (a.best.lat || a.best.depth ? `<span>aim ${a.best.lat ? Math.abs(a.best.lat) + " yd " + (a.best.lat < 0 ? "left" : "right") : ""}${a.best.lat && a.best.depth ? ", " : ""}${a.best.depth ? Math.abs(a.best.depth) + " yd " + (a.best.depth < 0 ? "short" : "long") : ""}</span>` : `<span class="muted">at the pin</span>`) : `<span class="muted">the curve: no green surfaces mapped</span>`}</div>`; }
+    html = `<div class="l1"><span class="club">${a.club}</span><span class="aim">plays ${Math.round(a.plays)} (${sgn(a.dz, 0)} ft)</span><span class="E">${fmt(r.E)}<small>strokes</small></span></div><div class="l2">${sheetPin(c, h) ? `<span class="muted">pin ${pinWords(sheetPin(c, h))}</span>` : ""}${a.best ? oddsShort(a.best.odds) + (a.best.lat || a.best.depth ? `<span>aim ${a.best.lat ? Math.abs(a.best.lat) + " yd " + (a.best.lat < 0 ? "left" : "right") : ""}${a.best.lat && a.best.depth ? ", " : ""}${a.best.depth ? Math.abs(a.best.depth) + " yd " + (a.best.depth < 0 ? "short" : "long") : ""}</span>` : `<span class="muted">at the pin</span>`) : `<span class="muted">the curve: no green surfaces mapped</span>`}${provSpan(c, h, a.best)}</div>`; }
   else if (r && r.kind === "gated") { el.className = "callbar quiet"; html = `<div class="l1"><span class="club">Tee shot not priced</span></div><div class="l2"><span class="muted">no fairway mapped and the imagery is not green enough to read one</span></div>`; }
   else { el.hidden = true; return; }
   el.innerHTML = html; el.dataset.target = target;
@@ -1031,7 +1077,7 @@ function renderCallbar(c, h, r){
 }
 // ---------------- hole card ----------------
 function oddsBar(od, cls="odds"){ return `<div class="${cls}">${ODDS.map(([k,c])=>`<i style="width:${(od[k]||0)*100}%;background:${c}" title="${k} ${pct(od[k])}"></i>`).join("")}</div>`; }
-function oddsLabels(od){ return `<div class="oddsl">${ODDS.filter(([k])=>od[k]>=0.005).map(([k,c,l])=>`<span style="--c:${c}">${l} ${pct(od[k])}</span>`).join("")}</div>`; }
+function oddsLabels(od){ return `<div class="oddsl">${ODDS.filter(([k])=>od[k]>=0.005).map(([k,c,l])=>`<span data-k="${k}" style="--c:${c}">${l} ${pct(od[k])}</span>`).join("")}</div>`; }
 function profileFor(h){
   const ovr = E.overrideFor(h); if (!ovr) return h.profile;
   const H = E.decodeHole(h); const pts = h.line.slice(0, -1).concat([ovr.pin]); const s = [], z = []; let cum = 0;
@@ -1043,12 +1089,11 @@ function profileSvg(h, r){
   const X = v => pad + v/L*(W-2*pad), Y = v => 8 + (1 - (v-zmin)/span)*(Hh-30);
   let d = ""; for (let i=0;i<s.length;i++) d += (i?"L":"M")+X(s[i]).toFixed(1)+" "+Y(z[i]).toFixed(1)+" ";
   const area = d + `L${X(L).toFixed(1)} ${Hh-10} L${X(0)} ${Hh-10} Z`;
-  let land = ""; if (r && r.landing) { const sx = Math.hypot(r.landing[0], r.landing[1]); const zi = interpProfile(h, sx); land = `<line x1="${X(sx).toFixed(1)}" y1="${Y(zi).toFixed(1)}" x2="${X(sx).toFixed(1)}" y2="${Hh-10}" stroke="var(--engine)" stroke-width="2" stroke-dasharray="4 3"/><circle cx="${X(sx).toFixed(1)}" cy="${Y(zi).toFixed(1)}" r="3.5" fill="var(--engine)"/><text x="${X(sx).toFixed(1)}" y="${(Y(zi)-7).toFixed(1)}" font-size="11" fill="var(--engine)" text-anchor="middle" font-family="var(--num)">lands ${Math.round(sx/YD)} · ${Math.round(zi - z[0])>0?"+":""}${Math.round(zi - z[0])} ft</text>`; }
-  return `<svg class="profile" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" role="img" aria-label="Elevation profile along the hole">
-    <path d="${area}" fill="var(--panel2)"/><path d="${d}" fill="none" stroke="var(--ink2)" stroke-width="1.5"/>${land}
-    <text x="${pad}" y="${Hh-13}" font-size="11" fill="var(--mute)" font-family="var(--num)">tee ${Math.round(z[0])} ft</text>
-    <text x="${W-pad}" y="${Hh-13}" font-size="11" fill="var(--mute)" text-anchor="end" font-family="var(--num)">green ${Math.round(z[z.length-1])} ft (${sgn(z[z.length-1]-z[0],0)})</text>
-    <text x="${W-pad}" y="14" font-size="11" fill="var(--mute)" text-anchor="end" font-family="var(--num)">low ${Math.round(zmin)} · high ${Math.round(zmax)}</text></svg>`;
+  let land = "", landLab = ""; if (r && r.landing) { const sx = Math.hypot(r.landing[0], r.landing[1]); const zi = interpProfile(h, sx); land = `<line x1="${X(sx).toFixed(1)}" y1="${Y(zi).toFixed(1)}" x2="${X(sx).toFixed(1)}" y2="${Hh-10}" stroke="var(--engine)" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/><circle cx="${X(sx).toFixed(1)}" cy="${Y(zi).toFixed(1)}" r="3.5" fill="var(--engine)"/>`;
+    let yTop = Y(zi); for (let i = 0; i < s.length; i++) if (Math.abs(X(s[i]) - X(sx)) <= 100) yTop = Math.min(yTop, Y(z[i]));   // above the line where the words sit
+    landLab = `<span class="pl" style="left:${Math.max(9, Math.min(91, X(sx) / W * 100)).toFixed(1)}%;top:${Math.max(13, 4 + yTop - 4).toFixed(1)}px">finishes ${Math.round(sx/YD)} · ${Math.round(zi - z[0])>0?"+":""}${Math.round(zi - z[0])} ft</span>`; }   // where the tee shot stops, on the hole's line (the card's "comes down" is where it lands)
+  return `<div class="profwrap"><div class="profcap top"><span>low ${Math.round(zmin)} · high ${Math.round(zmax)} ft</span></div><div class="profbox"><svg class="profile" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" role="img" aria-label="Elevation profile along the hole">
+    <path d="${area}" fill="var(--panel2)"/><path d="${d}" fill="none" stroke="var(--ink2)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>${land}</svg>${landLab}</div><div class="profcap"><span>tee ${Math.round(z[0])} ft</span><span>green ${Math.round(z[z.length-1])} ft (${sgn(z[z.length-1]-z[0],0)})</span></div></div>`;
 }
 function interpProfile(h, sx){ const pr = profileFor(h); const s=pr.s, z=pr.ft; for (let i=1;i<s.length;i++) if (s[i]>=sx){ const t=(sx-s[i-1])/((s[i]-s[i-1])||1); return z[i-1]+t*(z[i]-z[i-1]); } return z[z.length-1]; }
 // ---------------- other rules for the same tee shot (session K, 2026-10-08): the engine's call against DECADE's corridor rule, driver down the line and two assumptions ----------------
@@ -1114,6 +1159,7 @@ function renderHole(){
       <div class="rows">
         <div><span>Leaves</span><span><b>${Math.round(b.rem)}</b> yd, plays <b>${Math.round(b.plays)}</b> (${sgn(A?A.dz:0,0)} ft)</span></div>
         ${A && A.best ? `<div><span>Then ${A.club} ${lieName(A.fromLie)} into the green</span><span>on <b>${pct(A.best.odds.green)}</b> · sand ${pct(A.best.odds.sand)} · water ${pct(A.best.odds.water)} · <b>${fmt(A.best.E)}</b> to hole out</span></div>` : ""}
+        ${provRow(c, h, b)}
         ${o.offGround ? `<div id="ownGround"><span>Down the ${o.offGround.whose ? nth(o.offGround.whose) : "next hole"} instead</span><span>${o.club} ${aimShort(o.offGround.aim)} · <b>${fmt(o.offGround.E)}</b>, ${fmt(r.E - o.offGround.E)} less — but it finishes on another hole's ground (${pct(o.offGround.foreign)} of the shots), so Loop plays the hole it is on</span></div>` : ""}
       </div></div>`;
     html += todayCard(c, h, r);
@@ -1132,6 +1178,7 @@ function renderHole(){
     html += `<div class="shot"><div class="E num">${fmt(r.E)}<small>strokes expected</small></div><div class="big">${a.club}<small>plays ${Math.round(a.plays)} (${sgn(a.dz,0)} ft)</small></div>
       ${a.best ? oddsBar(a.best.odds)+oddsLabels(a.best.odds) : `<div style="color:var(--mute);font-size:13.5px;margin-top:8px">No green surfaces are mapped here, so the number is the ${curveName(state.P.baseline)} curve for a ${Math.round(a.plays)}-yard shot, not a simulation.</div>`}
       ${a.best ? `<div class="rows"><div><span>Best target</span><span>${a.best.lat===0?"at the pin":Math.abs(a.best.lat)+" yd "+(a.best.lat<0?"left":"right")}${a.best.depth?", "+Math.abs(a.best.depth)+" yd "+(a.best.depth<0?"short":"long"):""} · median ${Math.round(a.best.prox)} ft from the hole</span></div>
+      ${provRow(c, h, a.best)}
       <div><span>Curve from this distance</span><span>fairway lie <b>${fmt(a.curveFairway)}</b></span></div></div>`:""}</div>`;
     html += todayCard(c, h, r);
   } else if (r.kind === "gated") {
@@ -1141,7 +1188,7 @@ function renderHole(){
   let more = "";
   more += `<h2>Elevation (USGS lidar)</h2>${profileSvg(h, r)}`;
   if (r.kind === "tee") {
-    more += `<h2>Every tee option</h2><div class="tablewrap"><table><thead><tr><th>Club</th><th class="n">Total</th><th>Aim</th><th>Window</th><th class="n">Expected</th><th>Where it lands</th><th class="n">Leaves</th><th class="n">Plays</th><th class="n" title="Yards between dead zones (desert, water, scrub) at this club's landing, on the widest line within 10° of the fairway's own">Dead zones</th></tr></thead><tbody>`; const RR = ensureRules(c, h, r);
+    more += `<h2>Every tee option</h2><div class="tablewrap"><table class="opts"><thead><tr><th>Club</th><th class="n">Total</th><th>Aim</th><th>Window</th><th class="n">Expected</th><th>Where it lands</th><th class="n">Leaves</th><th class="n">Plays</th><th class="n" title="Yards between dead zones (desert, water, scrub) at this club's landing, on the widest line within 10° of the fairway's own">Dead zones</th></tr></thead><tbody>`; const RR = ensureRules(c, h, r);
     for (const o of r.options) { const b=o.best; more += `<tr class="${o===r.options[0]?"pick":""}"><td>${o.club}</td><td class="n">${Math.round(o.total)}</td><td>${aimShort(b.aim)}</td><td>${aimShort(o.window[0])}–${aimShort(o.window[1])}</td><td class="n"><b>${fmt(b.E)}</b></td><td><span class="mini">${ODDS.map(([k,cc])=>`<i style="width:${(b.odds[k]||0)*100}%;background:${cc}"></i>`).join("")}</span> <span style="font-size:12px;color:var(--mute)">fw ${pct(b.odds.fairway)} · trouble ${pct((b.odds.desert||0)+(b.odds.water||0)+(b.odds.sand||0)+(b.odds.oob||0))}</span></td><td class="n">${Math.round(b.rem)}</td><td class="n">${Math.round(b.plays)}</td><td class="n">${RR ? `${RR.cr.clubs[o.club].width} yd${RR.cr.clubs[o.club].crossed ? " ✕" : ""}` : "–"}</td></tr>`; }
     more += `</tbody></table></div>`;
     more += rulesBlock(c, h, r);
@@ -1466,7 +1513,7 @@ function renderRound(){
     else tee = `<span style="color:var(--mute)">not priced</span>`;
     cards += `<div class="hc"><div class="l1"><a href="#" data-gohole="${h.hole}" class="hn">${h.hole}</a><span class="meta">par ${h.par} · ${h.card}${offCard(h) != null ? ` (${offCard(h)} on the line)` : ""}${sheetPin(c, h) ? ` · pin ${pinAbbr(sheetPin(c, h))}` : ""}${noteFor(c, h) ? ` · note` : ""}</span><span class="E num">${r.E!=null?fmt(r.E):"–"}</span><input class="score" data-hole="${h.hole}" value="${sc}" inputmode="numeric" aria-label="Score, hole ${h.hole}"></div>
       <div class="l2">${tee}${leaves?` · ${r.kind==="par3"?leaves:"leaves "+leaves.replace(" · ", ", plays ")}`:""}${app?` → ${app}`:""}</div>${sec ? `<div class="l3">second shot: ${sec}</div>` : ""}</div>`;
-    html += `<tr><td class="n"><a href="#" data-gohole="${h.hole}" style="font-weight:600">${h.hole}</a>${sheetPin(c, h) ? `<br><span class="chip" title="today's pin on this hole: ${pinWords(sheetPin(c, h))}">${pinAbbr(sheetPin(c, h))}</span>` : ""}${noteFor(c, h) ? `<br><span class="chip" title="your note: ${escA(noteFor(c, h))}">note</span>` : ""}</td><td class="n">${h.par}</td><td class="n">${h.card}${offCard(h) != null ? `<br><small title="the line drawn from the tee">${offCard(h)} on the line</small>` : ""}</td><td>${tee}</td><td class="n"><b>${fmt(r.E)}</b></td><td class="n">${leaves}</td><td>${app}</td><td>${sec}</td><td class="n"><input class="score" data-hole="${h.hole}" value="${sc}" style="width:44px;text-align:right;padding:2px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)" inputmode="numeric"></td></tr>`;
+    html += `<tr><td class="n"><a href="#" data-gohole="${h.hole}" style="font-weight:600">${h.hole}</a>${sheetPin(c, h) ? `<br><span class="chip" title="today's pin on this hole: ${pinWords(sheetPin(c, h))}">${pinAbbr(sheetPin(c, h))}</span>` : ""}${noteFor(c, h) ? `<br><span class="chip" title="your note: ${escA(noteFor(c, h))}">note</span>` : ""}</td><td class="n">${h.par}</td><td class="n">${h.card}${offCard(h) != null ? `<br><small title="the line drawn from the tee">${offCard(h)} on the line</small>` : ""}</td><td class="nw">${tee}</td><td class="n"><b>${fmt(r.E)}</b></td><td class="n nw">${leaves}</td><td>${app}</td><td>${sec}</td><td class="n"><input class="score" data-hole="${h.hole}" value="${sc}" style="width:44px;text-align:right;padding:2px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper)" inputmode="numeric"></td></tr>`;
   }
   const scored = rows.filter(x=>x.r&&x.r.E!=null&&+scoreOf(x.h)>0);
   const vsModel = scored.reduce((s,x)=>s+(+scoreOf(x.h)-x.r.E),0);
@@ -1486,7 +1533,7 @@ function renderRound(){
 function renderPocket(){
   const c = course(); const R = getResults(c); const nS = nSheet(c); const anyNote = c.holes.some(h => noteFor(c, h)); let html = `<h1>${c.club} — ${c.name} · ${c.tees}</h1><div class="sub">Loop pocket card · ${windText()}, ${state.P.temp_f}°F, ${state.P.setting}, ${pinText()}${nS ? ` (today's own pin on ${nS} hole${nS === 1 ? "" : "s"}: the Pin column)` : ""} · generated ${new Date().toLocaleDateString()}</div><table><thead><tr><th>#</th><th>Par</th><th>Yds</th>${nS ? "<th>Pin</th>" : ""}<th>Tee</th><th>Line</th><th>Then</th><th>Call</th>${anyNote ? "<th>Your note</th>" : ""}</tr></thead><tbody>`;
   for (const h of c.holes) { const r = R.holes[h.hole]; let tee="–", line="", then="", call="";
-    if (r && r.kind==="tee") { const o=r.options[0]; tee=o.club; const ly = r.landing ? Math.round(Math.abs(aimYd(o.best.aim, Math.hypot(r.landing[0],r.landing[1])/YD))) : 0; line=aimShort(o.best.aim)+(ly?" ≈ "+ly+" yd "+(o.best.aim<0?"L":"R"):"")+" (win "+aimShort(o.window[0])+"–"+aimShort(o.window[1])+")"; then=`${Math.round(o.best.rem)} → plays ${Math.round(o.best.plays)}${r.approach?", "+r.approach.club:""}`; if (r.goLay&&r.goLay.delta!=null) call = r.goLay.delta>0.05?`go (+${fmt(r.goLay.delta)})`:`lay up ${r.goLay.lay.leave}`; }
+    if (r && r.kind==="tee") { const o=r.options[0]; tee=o.club; const ly = r.landing ? Math.round(Math.abs(aimYd(o.best.aim, Math.hypot(r.landing[0],r.landing[1])/YD))) : 0; const LW = landingWindow(c, h, r); line=aimShort(o.best.aim)+(ly?" ≈ "+ly+" yd "+(o.best.aim<0?"L":"R"):"")+" (win "+(LW ? (LW.w1 > LW.w0 ? sideYd(LW.l, true)+"–"+sideYd(LW.r, true) : sideYd(LW.l, true)+" only") : aimShort(o.window[0])+"–"+aimShort(o.window[1]))+")"; then=`${Math.round(o.best.rem)} → plays ${Math.round(o.best.plays)}${r.approach?", "+r.approach.club:""}`; if (r.goLay&&r.goLay.delta!=null) call = r.goLay.delta>0.05?`go (+${fmt(r.goLay.delta)})`:`lay up ${r.goLay.lay.leave}`; }
     else if (r && r.kind==="par3") { tee=r.approach.club; then=`plays ${Math.round(r.approach.plays)} (${sgn(r.approach.dz,0)} ft)`; }
     const sp = nS ? sheetPin(c, h) : null;
     html += `<tr><td>${h.hole}</td><td>${h.par}</td><td>${h.card}${offCard(h) != null ? ` <small>(${offCard(h)} on the line)</small>` : ""}</td>${nS ? `<td>${sp ? pinWords(sp) + (Math.round(+sp.pin_lat || 0) ? ` ${Math.abs(Math.round(+sp.pin_lat))} ${+sp.pin_lat < 0 ? "L" : "R"}` : "") : ""}</td>` : ""}<td>${tee}</td><td>${line}</td><td>${then}</td><td>${call}</td>${anyNote ? `<td>${pocketSays(c, h)}</td>` : ""}</tr>`; }
@@ -1560,8 +1607,10 @@ function bookMap(cv, c, h, r, F, A, scale){
   if (state.P.oob) { ctx.save(); ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.lineWidth = .6; const ob = (ix, iy) => ix >= 0 && iy >= 0 && ix < H.nx && iy < H.ny && H.lie[iy * H.nx + ix] >= 10;
     for (let iy = 1; iy < H.ny - 1; iy++) for (let ix = 1; ix < H.nx - 1; ix++) { if (!ob(ix, iy) || ((ix + iy) & 1) || (ob(ix - 1, iy) && ob(ix + 1, iy) && ob(ix, iy - 1) && ob(ix, iy + 1))) continue;
       const [a1, b1] = px(H.x0 + (ix + .5) * cell, -H.w + (iy + .5) * cell); ctx.beginPath(); ctx.arc(a1, b1, 1.6, 0, 7); ctx.fill(); ctx.stroke(); } ctx.restore(); }
+  const boxes = [], foot = [];   // every label's box; the window band's footprint, discs [x, y, r] that the later labels keep off (session Q)
+  const footHits = b => foot.reduce((n, [x, y, r]) => { const dx = Math.max(b[0] - x, 0, x - (b[0] + b[2])), dy = Math.max(b[1] - y, 0, y - (b[1] + b[3])); return n + (dx * dx + dy * dy < r * r ? 1 : 0); }, 0);
   const label = (txt, x, y, opts = {}) => { ctx.save(); ctx.font = `bold ${opts.size || 11}px ${NUM}`; const tw = ctx.measureText(txt).width; const bx = opts.align === "right" ? x - tw - 6 : opts.align === "center" ? x - tw / 2 - 3 : x;
-    ctx.fillStyle = opts.bg || "rgba(0,0,0,.72)"; ctx.fillRect(bx, y - 8, tw + 6, 15); ctx.fillStyle = opts.fg || "#fff"; ctx.fillText(txt, bx + 3, y + 3.5); ctx.restore(); return tw + 6; };
+    ctx.fillStyle = opts.bg || "rgba(0,0,0,.72)"; ctx.fillRect(bx, y - 8, tw + 6, 15); boxes.push([bx, y - 8, tw + 6, 15]); ctx.fillStyle = opts.fg || "#fff"; ctx.fillText(txt, bx + 3, y + 3.5); ctx.restore(); return tw + 6; };
   // distance arcs from the tee
   const [tx, ty] = px(0, 0);
   if (h.par !== 3) { ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.setLineDash([4, 5]); ctx.lineWidth = 1;
@@ -1572,22 +1621,90 @@ function bookMap(cv, c, h, r, F, A, scale){
   // the hole line
   ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 1.5; ctx.beginPath(); F.line.forEach((p, i) => { const [a, b] = px(p[0], p[1]); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }); ctx.stroke(); ctx.restore();
   // the engine's call: the window, the line, the landing; the approach
-  const pin = F.H.pin; const [qx, qy] = px(pin[0], pin[1]); let landLab = null;   // the landing's label goes on last, over the hazards' labels
+  const pin = F.H.pin; const [qx, qy] = px(pin[0], pin[1]); let landLab = null, ends = null; cv.dataset.window = "";   // the window's and the landing's labels go on last, over the hazards' labels
   if (r && r.kind === "tee") { const o = r.options[0]; const carryM = Math.hypot(r.landing[0], r.landing[1]);
     ctx.beginPath(); ctx.moveTo(tx, ty); for (let a = o.window[0]; a <= o.window[1]; a += 1) { const rad = a * Math.PI / 180; const [qx2, qy2] = px(Math.cos(rad) * carryM, Math.sin(rad) * carryM); ctx.lineTo(qx2, qy2); } ctx.closePath(); ctx.fillStyle = "rgba(200,16,46,.16)"; ctx.fill();
     const [lx, ly] = px(r.landing[0], r.landing[1]); ctx.save(); ctx.strokeStyle = "#c8102e"; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(lx, ly); ctx.stroke();
     ctx.setLineDash([6, 5]); ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(qx, qy); ctx.stroke(); ctx.restore();
-    ctx.fillStyle = "#c8102e"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(lx, ly, 4.5, 0, 7); ctx.fill(); ctx.stroke();
-    landLab = [`${o.club} ${Math.round(carryM / YD)} · ${Math.round(o.best.rem)} in`, lx + 8, ly]; }
+    // the window at the landing distance (session Q, OPPORTUNITIES 59): the hole page's band (O's landingWindow, read as it is) across the
+    // hole where the window's aim lines reach the median landing, its ends ticked, each edge's yards beside its end, the landing's dot over
+    // it. Its footprint — the arc with its white edge, the ticks, the dot — is kept clear by every later label: the yardage dots', the
+    // hazards', the carry's (each moves to its first alternative clear of it), then its own and the landing's (placed last, clear of all)
+    const LW = landingWindow(c, h, r); landLab = [`${o.club} ${Math.round(carryM / YD)} · ${Math.round(o.best.rem)} in`, lx + 8, ly];
+    cv.dataset.window = LW ? JSON.stringify({ d: +LW.d.toFixed(1), aL: +LW.aL.toFixed(3), w0: LW.w0, w1: LW.w1, l: +LW.l.toFixed(1), r: +LW.r.toFixed(1), width: +LW.width.toFixed(1) }) : "";
+    if (LW) { const rM = LW.d * YD, k = 9 * f.res; const at = (a, rr) => { const t = a * Math.PI / 180; return px(Math.cos(t) * rr, Math.sin(t) * rr); };
+      const arcAt = (a0, a1) => { ctx.beginPath(); for (let a = a0, i = 0; a <= a1 + 1e-9; a += 0.25, i++) { const [p1, q1] = at(a, rM); i ? ctx.lineTo(p1, q1) : ctx.moveTo(p1, q1); } };
+      ctx.save(); ctx.lineCap = "round";
+      if (LW.w1 > LW.w0) { arcAt(LW.w0, LW.w1); ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 8; ctx.stroke(); arcAt(LW.w0, LW.w1); ctx.strokeStyle = "#c8102e"; ctx.lineWidth = 4.5; ctx.stroke(); }
+      ctx.lineCap = "butt"; for (const a of [LW.w0, LW.w1]) { const [p1, q1] = at(a, rM - k), [p2, q2] = at(a, rM + k);
+        ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(p1, q1); ctx.lineTo(p2, q2); ctx.stroke(); ctx.strokeStyle = "#c8102e"; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(p1, q1); ctx.lineTo(p2, q2); ctx.stroke(); }
+      ctx.restore();
+      const da = Math.max(0.02, 1.2 * f.res / rM * 180 / Math.PI); for (let a = LW.w0; a <= LW.w1 + 1e-9; a += da) { const [p1, q1] = at(a, rM); foot.push([p1, q1, 5]); }
+      for (const a of [LW.w0, LW.w1]) for (let j = -9; j <= 9; j += 1.5) { const [p1, q1] = at(a, rM + j * f.res); foot.push([p1, q1, 3.5]); }
+      foot.push([lx, ly, 7]);
+      const unit = (x0, y0, x1, y1) => { const n = Math.hypot(x1 - x0, y1 - y0) || 1; return [(x1 - x0) / n, (y1 - y0) / n]; };
+      const along = (a, b2) => { const [x0, y0] = at(a, rM), [x1, y1] = at(b2, rM); return unit(x0, y0, x1, y1); };   // on the canvas, along the band from a toward b2
+      const out = a => { const [x0, y0] = at(a, rM), [x1, y1] = at(a, rM + f.res); return unit(x0, y0, x1, y1); };   // on the canvas, away from the tee
+      ends = (LW.w1 > LW.w0 ? [[LW.w0, sideYd(LW.l, true), along(LW.w0 + 0.1, LW.w0)], [LW.w1, sideYd(LW.r, true), along(LW.w1 - 0.1, LW.w1)]] : [[LW.w0, sideYd(LW.l, true) + " only", along(LW.w0 - 0.1, LW.w0), true]])
+        .map(([a, txt, t, both]) => { const [ex, ey] = at(a, rM); return { txt, ex, ey, t, u: out(a), both }; });
+      landLab.push(out(LW.aL), lx, ly); }
+    ctx.fillStyle = "#c8102e"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(lx, ly, 4.5, 0, 7); ctx.fill(); ctx.stroke(); }
   else if (r && r.kind === "par3") { ctx.save(); ctx.strokeStyle = "#c8102e"; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(qx, qy); ctx.stroke(); ctx.restore(); }
-  // to the middle of the green, along the line
-  for (const m of F.markers) { const [a, b] = px(m.x, m.y); ctx.fillStyle = "#fff"; ctx.strokeStyle = "#000"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(a, b, 3.5, 0, 7); ctx.fill(); ctx.stroke(); label(String(m.yd), a + 6, b, { bg: "rgba(255,255,255,.92)", fg: "#000", size: 10 }); }
+  // to the middle of the green, along the line (the dots here; their labels with the others below)
+  const reqs = [], dots = [];
+  for (const m of F.markers) { const [a, b] = px(m.x, m.y); ctx.fillStyle = "#fff"; ctx.strokeStyle = "#000"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(a, b, 3.5, 0, 7); ctx.fill(); ctx.stroke(); dots.push([a - 5, b - 5, 10, 10]);
+    reqs.push({ txt: String(m.yd), at: [a, b], x: a + 6, y: b, o: { bg: "rgba(255,255,255,.92)", fg: "#000", size: 10 }, alts: [[a - 6, b, "right"], [a + 6, b - 14], [a + 6, b + 14], [a - 6, b - 14, "right"], [a - 6, b + 14, "right"], [a, b - 13, "center"], [a, b + 13, "center"],
+      [a + 6, b - 24], [a + 6, b + 24], [a - 6, b - 24, "right"], [a - 6, b + 24, "right"], [a, b - 22, "center"], [a, b + 22, "center"]] }); }
   // the tee shot's hazards: reach and carry from the tee; ground across the line
-  let nh = 0; for (const b of F.tee) { const [a, bb] = px(b.cx, b.cy); const right = b.side > 0; label(b.lay ? `↑${b.toGreenFar}–${b.toGreen}` : `${b.reach}–${b.carry}`, right ? a + 6 : a - 6, bb, { align: right ? "left" : "right", size: 10, bg: b.kind === "water" ? "rgba(20,70,140,.88)" : "rgba(120,90,20,.88)" }); nh++; }
-  for (const x of F.cross) { const [a, b] = px(x.x, x.y); label(`${x.kind} ${x.from}–${x.to}`, a, b, { align: "center", size: 10, bg: "rgba(90,60,20,.85)" }); nh++; }
-  if (F.carry) { const [a, b] = px(F.carry.x, F.carry.y); ctx.save(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a - 7, b); ctx.lineTo(a + 7, b); ctx.stroke(); ctx.restore(); label(`carry ${F.carry.yd}`, a + 10, b, { size: 10, bg: "rgba(90,60,20,.88)" }); nh++; }
+  let nh = 0; for (const b of F.tee) { const [a, bb] = px(b.cx, b.cy); const right = b.side > 0, x0 = right ? a + 6 : a - 6, x1 = right ? a - 6 : a + 6, s0 = right ? "left" : "right", s1 = right ? "right" : "left";
+    reqs.push({ txt: b.lay ? `↑${b.toGreenFar}–${b.toGreen}` : `${b.reach}–${b.carry}`, at: [a, bb], x: x0, y: bb, o: { align: s0, size: 10, bg: b.kind === "water" ? "rgba(20,70,140,.88)" : "rgba(120,90,20,.88)" },
+      alts: [[x0, bb - 16, s0], [x0, bb + 16, s0], [x1, bb, s1], [x1, bb - 16, s1], [x1, bb + 16, s1], [a, bb - 18, "center"], [a, bb + 18, "center"], [x0, bb - 26, s0], [x0, bb + 26, s0], [x1, bb - 26, s1], [x1, bb + 26, s1]] }); nh++; }
+  for (const x of F.cross) { const [a, b] = px(x.x, x.y); reqs.push({ txt: `${x.kind} ${x.from}–${x.to}`, at: [a, b], x: a, y: b, o: { align: "center", size: 10, bg: "rgba(90,60,20,.85)" }, alts: [[a, b - 16, "center"], [a, b + 16, "center"], [a + 8, b, "left"], [a - 8, b, "right"], [a + 8, b - 16, "left"], [a - 8, b - 16, "right"],
+      [a + 8, b + 16, "left"], [a - 8, b + 16, "right"], [a, b - 26, "center"], [a, b + 26, "center"], [a, b - 36, "center"], [a, b + 36, "center"]] }); nh++; }
+  let tick = null; if (F.carry) { const [a, b] = px(F.carry.x, F.carry.y); ctx.save(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a - 7, b); ctx.lineTo(a + 7, b); ctx.stroke(); ctx.restore(); tick = [a - 8, b - 2, 16, 4];
+    reqs.push({ txt: `carry ${F.carry.yd}`, at: [a, b], x: a + 10, y: b, o: { size: 10, bg: "rgba(90,60,20,.88)" }, alts: [[a - 10, b, "right"], [a + 10, b - 14], [a + 10, b + 14], [a - 10, b - 14, "right"], [a - 10, b + 14, "right"], [a + 10, b - 24], [a + 10, b + 24]] }); nh++; }
   cv.dataset.hazards = nh;
-  if (landLab) label(landLab[0], landLab[1], landLab[2], { bg: "rgba(200,16,46,.92)" });
+  // where each of these labels goes (session Q): where it always has, unless that is on the window's band (its footprint) or on a label already
+  // drawn, a yardage dot, the pin and its flag, the tee, the north arrow, the scale or the carry's tick (session Q's sixth lane: two bunkers'
+  // labels had sat on one another on 31 of 234 maps) — then the alternative that keeps off the band, the labels already placed, the places the
+  // labels after it take, the dots, the pin, the tee and the tick, the nearest winning a tie (where every alternative touches something, the
+  // one touching least, the band counting most); a label whose own place is clear stays there
+  const sc50 = 50 * YD / f.res; const obst = [[qx - 6, qy - 26, 19, 32], [tx - 7, ty - 7, 14, 14], [4, 6, 36, 38], [f.W - sc50 - 14, f.H - 30, sc50 + 6, 24], ...dots].concat(tick ? [tick] : []);
+  const ovA = (b, q) => Math.max(0, Math.min(b[0] + b[2], q[0] + q[2]) - Math.max(b[0], q[0])) * Math.max(0, Math.min(b[1] + b[3], q[1] + q[3]) - Math.max(b[1], q[1]));
+  const offMap = b => b[0] < 1 || b[1] < 1 || b[0] + b[2] > f.W - 1 || b[1] + b[3] > f.H - 1;
+  const boxAt = (x, y, w, al) => [al === "right" ? x - w : al === "center" ? x - w / 2 : x, y - 8, w, 15];
+  const defs = reqs.map(r => { ctx.save(); ctx.font = `bold ${r.o.size || 11}px ${NUM}`; r.w = ctx.measureText(r.txt).width + 6; ctx.restore(); return boxAt(r.x, r.y, r.w, r.o.align); }); const moved = [], placed = [];
+  const prefs = []; { const ex2 = (v, w) => w / 2 * Math.abs(v[0]) + 7.5 * Math.abs(v[1]), wOf = (t, sz) => { ctx.save(); ctx.font = `bold ${sz}px ${NUM}`; const w = ctx.measureText(t).width + 6; ctx.restore(); return w; };
+    for (const e of ends || []) { const w = wOf(e.txt, 10), d = 6 + ex2(e.t, w), q = [e.ex + e.t[0] * d - w / 2, e.ey + e.t[1] * d - 7.5, w, 15]; if (!footHits(q) && !offMap(q) && !obst.some(z => ovA(q, z) > 0.25)) prefs.push(q); } }
+  // a label stays nearer the point it names than any other of its kind (a dot's label by its dot, a hazard's by its hazard)
+  const kindOf = t => /^\d+$/.test(t) ? "dot" : t.startsWith("carry") ? "carry" : "hz", ptBox = (p, b) => Math.hypot(Math.max(b[0] - p[0], 0, p[0] - (b[0] + b[2])), Math.max(b[1] - p[1], 0, p[1] - (b[1] + b[3])));
+  const strays = (r, q) => { const own = ptBox(r.at, q); return reqs.some(o => o !== r && kindOf(o.txt) === kindOf(r.txt) && (o.at[0] !== r.at[0] || o.at[1] !== r.at[1]) && ptBox(o.at, q) + 2 < own); };
+  const taken = q => footHits(q) > 0 || offMap(q) || boxes.concat(obst).some(z => ovA(q, z) > 0.25);   // its place is on the band or on something already there
+  reqs.forEach((r, i) => { let b = defs[i];
+    if (taken(b)) { let best = null;
+      for (const [ax, ay, al] of [[r.x, r.y, r.o.align]].concat([-1, 1, -2, 2, -4, 4, -8, 8].map(dy => [r.x, r.y + dy]), r.alts)) { const q = boxAt(ax, ay, r.w, al === undefined ? r.o.align : al);
+        const sq = footHits(q) * 500 + (offMap(q) ? 1e6 : 0) + boxes.concat(defs.slice(i + 1), obst, prefs).reduce((sm, z) => { const a = ovA(q, z); return sm + (a > 0.25 ? a + 20 : 0); }, 0) + (strays(r, q) ? 30 : 0) + Math.hypot(q[0] - b[0], q[1] - b[1]) / 4;
+        if (!best || sq < best.s) best = { q, s: sq }; }
+      if (best.q !== b) { b = best.q; moved.push(b.map(v => Math.round(v))); } }
+    ctx.save(); ctx.font = `bold ${r.o.size || 11}px ${NUM}`; ctx.fillStyle = r.o.bg || "rgba(0,0,0,.72)"; ctx.fillRect(b[0], b[1], b[2], b[3]); ctx.fillStyle = r.o.fg || "#fff"; ctx.fillText(r.txt, b[0] + 3, b[1] + 11.5); ctx.restore(); boxes.push(b); placed.push([r.txt, Math.round(r.at[0]), Math.round(r.at[1])].concat(b.map(v => Math.round(v)))); });
+  cv.dataset.boxes = JSON.stringify(boxes.map(b => b.map(v => Math.round(v)))); cv.dataset.moved = JSON.stringify(moved); cv.dataset.placed = JSON.stringify(placed); cv.dataset.obst = JSON.stringify(obst.map(b => b.map(v => Math.round(v))));
+  if (ends) {
+    const cost = b => (offMap(b) ? 1e6 : 0) + footHits(b) * 1e3 + boxes.concat(obst).reduce((sm, q) => sm + ovA(b, q), 0);
+    const ext = (v, w) => w / 2 * Math.abs(v[0]) + 7.5 * Math.abs(v[1]);   // how far a box w × 15 reaches along v from its centre
+    const nrm = (v, q2) => { const x = v[0] + q2[0], y = v[1] + q2[1], n = Math.hypot(x, y) || 1; return [x / n, y / n]; };
+    const put = (txt, size, bg, x0, y0, dirs, gaps) => { ctx.save(); ctx.font = `bold ${size}px ${NUM}`; const w = ctx.measureText(txt).width + 6; ctx.restore(); let best = null;
+      search: for (const g of gaps) for (const v of dirs) { const d = g + ext(v, w); const b = [x0 + v[0] * d - w / 2, y0 + v[1] * d - 7.5, w, 15]; const sc2 = cost(b) + g / 100; if (!best || sc2 < best.s) best = { b, s: sc2 }; if (sc2 < 1) break search; }
+      label(txt, best.b[0], best.b[1] + 8, { size, bg }); return [Math.round(best.b[0]), Math.round(best.b[1]), Math.round(w), 15, Math.round(best.s)]; };
+    const turn = (v, deg) => { const t = deg * Math.PI / 180, cs = Math.cos(t), sn = Math.sin(t); return [v[0] * cs - v[1] * sn, v[0] * sn + v[1] * cs]; };
+    const fan = (v, degs) => degs.map(dg => turn(v, dg));   // directions round v, in the order given
+    // each edge's yards beside its end: along the band outward first, then turning toward the green and the tee (a one-aim window: both ways)
+    cv.dataset.ends = JSON.stringify(ends.map(e => { const side = Math.sign(e.t[0] * e.u[1] - e.t[1] * e.u[0]) || 1;   // turning e.t by +90° · side points away from the tee
+      const dirs = fan(e.t, [0, 45 * side, -45 * side, 90 * side, -90 * side, 135 * side, -135 * side].concat(e.both ? [180] : []));
+      return put(e.txt, 10, "rgba(0,0,0,.78)", e.ex, e.ey, dirs, [6, 12, 18]).concat([e.txt, Math.round(e.ex), Math.round(e.ey)]); }));
+    // the landing's label: the tee's side of its dot first, then round it — the nearest ring of places first
+    const [, , , u, lx, ly] = landLab, m = [-u[0], -u[1]];
+    cv.dataset.landlab = JSON.stringify(put(landLab[0], 11, "rgba(200,16,46,.92)", lx, ly, fan(m, [0, -30, 30, -60, 60, -90, 90, -120, 120, -150, 150, 180]), [8, 14, 20, 26])); }
+  else if (landLab) label(landLab[0], landLab[1], landLab[2], { bg: "rgba(200,16,46,.92)" });
   // the pin and the tee
   ctx.save(); ctx.fillStyle = "#fff"; ctx.strokeStyle = "#c8102e"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(qx, qy, 4.5, 0, 7); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(qx, qy - 5); ctx.lineTo(qx, qy - 24); ctx.stroke();
   ctx.fillStyle = "#c8102e"; ctx.beginPath(); ctx.moveTo(qx, qy - 24); ctx.lineTo(qx + 11, qy - 19.5); ctx.lineTo(qx, qy - 15); ctx.fill();
@@ -1602,8 +1719,9 @@ function bookText(c, h, r, F){
   const odds = o => ["fairway", "rough", "sand", "water", "desert", "oob"].filter(k => (o[k] || 0) >= 0.01).map(k => `${k === "oob" ? "out of bounds" : k === "desert" ? dW(c) : k} ${pct(o[k])}`).join(" · ");
   let t = `<div class="ybtt">${h.hole}<span class="sub">Par ${h.par} · ${h.card} yd${offCard(h) != null ? ` (${offCard(h)} on the line)` : ""}${h.si ? ` · SI ${h.si}` : ""}${F && F.dz ? ` · green ${Math.abs(F.dz)} ft ${F.dz < 0 ? "below" : "above"} the tee` : ""}</span></div>`;
   if (!r) return t + `<p>${h.nodata ? "No measured line for this hole: not priced." : "Not priced yet."}</p>` + (noteFor(c, h) ? bookNote(c, h) : "");
-  if (r.kind === "tee") { const o = r.options[0], b = o.best;
-    t += `<p><span class="k">Tee:</span> <b>${o.club}</b> ${aimShort(b.aim)} (window ${aimShort(o.window[0])}–${aimShort(o.window[1])}): lands ${Math.round(Math.hypot(r.landing[0], r.landing[1]) / YD)}, leaves ${Math.round(b.rem)} (plays ${Math.round(b.plays)})${r.approach && r.approach.best ? ` → <b>${r.approach.club}</b>, on the green ${pct(r.approach.best.odds.green)}` : ""}</p>`;
+  if (r.kind === "tee") { const o = r.options[0], b = o.best; const LW = landingWindow(c, h, r), landYd = Math.hypot(r.landing[0], r.landing[1]) / YD;   // in yards at the landing (session Q)
+    const call = LW ? `${b.aim === 0 ? "straight" : sideYd(aimYd(b.aim, landYd), true)} (${LW.w1 > LW.w0 ? `window ${sideYd(LW.l, true)}–${sideYd(LW.r, true)}` : "window: this aim only,"} at ${Math.round(LW.d)}):` : `${aimShort(b.aim)} (window ${aimShort(o.window[0])}–${aimShort(o.window[1])}): lands ${Math.round(landYd)},`;
+    t += `<p><span class="k">Tee:</span> <b>${o.club}</b> ${call} leaves ${Math.round(b.rem)} (plays ${Math.round(b.plays)})${r.approach && r.approach.best ? ` → <b>${r.approach.club}</b>, on the green ${pct(r.approach.best.odds.green)}` : ""}</p>`;
     t += `<p><span class="k">Off the tee:</span> ${odds(b.odds)}</p>`;
     if (r.goLay && r.goLay.delta != null) t += `<p><span class="k">Second shot:</span> ${r.goLay.delta > 0.05 ? `go — ${fmt(r.goLay.delta)} better than laying up` : `lay up to ${r.goLay.lay.leave} — ${fmt(-r.goLay.delta)} better than going`}</p>`;
     else if (r.goLay && r.goLay.lay) t += `<p><span class="k">Second shot:</span> the green is out of reach — lay up to ${r.goLay.lay.leave}${r.goLay.lay.club ? ` (${r.goLay.lay.club})` : ""}</p>`; }
@@ -1626,7 +1744,7 @@ function bookText(c, h, r, F){
 async function renderBook(c){
   const R = getResults(c); const el = $("#ybook"); const nS = nSheet(c); const SCALE = 1.5;
   const head = `<div class="ybhead"><span><b>${esc(c.club === c.name ? c.name : c.club + " — " + c.name)}</b> · ${esc(c.tees)} · par ${c.par} · ${c.yards.toLocaleString()} yd</span><span>Loop yardage book · ${windText()}, ${state.P.temp_f}°F, ${state.P.setting}, ${pinText()}${nS ? ` (today's own pin on ${nS} hole${nS === 1 ? "" : "s"})` : ""} · for the ${esc(playerLabel())} golfer (Driver ${Math.round((clubsAsPlayed().find(k => k.name === "Driver") || {}).carry || 0)} carry) · ${new Date().toLocaleDateString()}</span></div>`;
-  const foot = `<div class="ybfoot">Yards are from the tee, straight-line, unless they say "to the green" (white dots and ↑: to its middle). Hazards: reach–carry from the tee; past the drive on a par 5, ↑ far edge–near edge to the green. Red: the engine's line and window under these conditions; its numbers are model strokes that compare choices, not a score prediction. Imagery © Esri, Maxar, Earthstar Geographics and the GIS user community · map data © OpenStreetMap contributors · elevation USGS 3DEP.</div>`;
+  const foot = `<div class="ybfoot">Yards are from the tee, straight-line, unless they say "to the green" (white dots and ↑: to its middle). Hazards: reach–carry from the tee; past the drive on a par 5, ↑ far edge–near edge to the green. Red: the engine's line and window under these conditions — the band is the window's aims at the landing distance, its edges in yards left (L) or right (R) of the line from the tee to the pin; its numbers are model strokes that compare choices, not a score prediction. Imagery © Esri, Maxar, Earthstar Geographics and the GIS user community · map data © OpenStreetMap contributors · elevation USGS 3DEP.</div>`;
   const blocks = c.holes.map(h => { const r = R.holes[h.hole] || null; return { h, r, F: h.nodata || !h.frame ? null : bookFeatures(c, h, r) }; });
   let html = ""; for (let i = 0; i < blocks.length; i += 2) { html += `<div class="ybp">${head}<div class="ybrow">`;
     for (const b of blocks.slice(i, i + 2)) html += `<div class="ybh${noteFor(c, b.h) ? ` hasnote" style="--shrink:${bookShrink(c, b.h)}px` : ""}" data-hole="${b.h.hole}">${b.F ? `<div class="ybmapbox"><canvas id="yb_${b.h.hole}"></canvas></div>` : ""}<div class="ybtxt">${bookText(c, b.h, b.r, b.F)}</div></div>`;
@@ -1691,7 +1809,7 @@ function renderRounds(){
   bind("rContinue", () => { const r = activeRound(); state.course = r.course; store.set("course", r.course); const hs = Object.keys(r.holes||{}).map(Number).sort((x,y)=>x-y); const next = hs.length ? Math.min(18, Math.max(...hs) + (r.holes[Math.max(...hs)].score != null ? 1 : 0)) : 1; state.hole = next; store.set("hole", next); renderHeader(); setView("hole"); });
   bind("rFinish", finishRound);
   bind("rAbandon", () => { if (state.confirmAbandon) { const id = state.activeRound; state.rounds = state.rounds.filter(r => r.id !== id); state.activeRound = null; if (state.openRound === id) state.openRound = null; state.confirmAbandon = false; saveRounds(); renderRounds(); toast("Round deleted."); } else { state.confirmAbandon = true; $("#rAbandon").textContent = "Really delete it?"; setTimeout(() => { state.confirmAbandon = false; const b = $("#rAbandon"); if (b) b.textContent = "Abandon"; }, 4000); } });
-  bind("rSample", () => { const r = LG.simulateRound(state.course, snapshotP(), (Date.now() % 100000) + 1, { date: today() }); state.rounds.push(r); state.openRound = r.id; saveRounds(); renderRounds(); toast("Sample round added — simulated by the engine, labelled, not yours."); });
+  bind("rSample", () => { const r = LG.simulateRound(state.course, snapshotP(), (Date.now() % 100000) + 1, { date: today() }); r.P = Object.assign(snapshotP(), r.P); /* priced with the model it was played with, stamped (session Q's eighth lane) */ state.rounds.push(r); state.openRound = r.id; saveRounds(); renderRounds(); toast("Sample round added — simulated by the engine, labelled, not yours."); });
   bind("useMeasured", () => { const m = LG.playerModel(analyses); const ov = state.P.clubsOverride ? state.P.clubsOverride.slice() : []; let n = 0; for (const x of m.measured) { const base = E.clubTable(state.P).find(c => c.name === x.club); if (!base) continue; let oo = ov.find(q => q.name === x.club); if (!oo) { oo = Object.assign({}, base); ov.push(oo); } const roll = state.P.setting === "firm" ? base.roll_firm : base.roll_soft; oo.carry = Math.max(30, Math.round(x.total - roll)); n++; } if (n) { state.P.clubsOverride = ov; saveP(); toast(`${n} club${n===1?"":"s"} now use your measured totals; Settings → Your own clubs → Clear your own clubs undoes it.`); renderRounds(); } });
   $$("[data-open]").forEach(b => b.addEventListener("click", () => { state.openRound = state.openRound === b.dataset.open ? null : b.dataset.open; state.confirmDel = null; renderRounds(); }));
   $$("[data-del]").forEach(b => b.addEventListener("click", () => { const id = b.dataset.del; if (state.confirmDel === id) { state.rounds = state.rounds.filter(r => r.id !== id); if (state.activeRound === id) state.activeRound = null; if (state.openRound === id) state.openRound = null; delete state.ledger[id]; state.confirmDel = null; saveRounds(); renderRounds(); toast("Round deleted."); } else { state.confirmDel = id; renderRounds(); setTimeout(() => { if (state.confirmDel === id) { state.confirmDel = null; if (state.view === "rounds") renderRounds(); } }, 4000); } }));
@@ -1947,6 +2065,11 @@ function todayCard(c, h, r){
   return html;
 }
 // ---------------- settings ----------------
+// A select as wide as its longest option (session Q's eighth lane): Chromium sized the settings' selects a few characters short of their
+// words ("as the leve"); measured with the select's own font, never under the number inputs' 110 px
+function fitSelects(root){ const g = fitSelects.g || (fitSelects.g = document.createElement("canvas").getContext("2d"));
+  root.querySelectorAll("select").forEach(sl => { const cs = getComputedStyle(sl); g.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; const w = Math.max(0, ...[...sl.options].map(o => g.measureText(o.text).width));
+    sl.style.minWidth = Math.max(110, Math.ceil(w + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + 26)) + "px"; }); }
 function renderSettings(){
   const P = state.P; const el = $("#viewSettings");
   const clubs = E.clubTable(P).map(c => { const o = (P.clubsOverride||[]).find(x=>x.name===c.name) || {}; return Object.assign({}, c, o); });
@@ -1982,7 +2105,7 @@ function renderSettings(){
     <label>… lost (stroke and distance) <input type="number" id="s_desert_lost" min="0" max="100" step="5" value="${Math.round(E.desertShares(P)[2]*100)}" inputmode="numeric" style="width:4.5em"></label>
     <p class="help">Where the club's card makes the desert a penalty area or gives a one-stroke drop at the grass line (Cochise, Geronimo, Chiricahua and Outlaw; Talon and Raptor), a ball not played as it lies is a stroke and a drop at the grass line — unplayable and lost cost the same there. Elsewhere the Rules: a drop on desert ground, or stroke and distance.</p>
     <details class="adv"><summary style="cursor:pointer;color:var(--ink2);font-size:13.5px;margin:6px 0">Advanced</summary>
-      <label>Strokes-to-hole-out curve <select id="s_baseline">${["tour","scratch","hcp10","hcp20"].filter(b => D.bases[b]).map(b => `<option value="${b}" ${P.baseline===b?"selected":""}>${({tour:"PGA Tour (Broadie)",scratch:"scratch amateur (Arccos figures)",hcp10:"10-handicap (modelled)",hcp20:"20-handicap (modelled)"})[b]}</option>`).join("")}</select></label>
+      <label>Strokes-to-hole-out curve <select id="s_baseline">${["tour","scratch","hcp10","hcp20"].filter(b => D.bases[b]).map(b => `<option value="${b}" ${P.baseline===b?"selected":""}>${({tour:"PGA Tour (Broadie)",scratch:"scratch (Arccos)",hcp10:"10 hcp (modelled)",hcp20:"20 hcp (modelled)"})[b]}</option>`).join("")}</select></label>
       <label>Spread multiplier <input type="range" id="s_disp" min="0.6" max="1.6" step="0.05" value="${P.disp}"> <span class="num" id="s_disp_v">${Math.round(P.disp*100)}%</span></label>
     </details>
     <p class="help">The levels' patterns are session E's shot mixture fitted to Broadie's Golfmetrics (the tee shot's direction, the greens hit from 100–150 yd in the fairway and how close the shots finish) and to Shot Scope's short-against-long misses; on the generic 26 × 28-yd green the scratch pattern hits 74 % from 100–150 yd. On Loop's own greens the same patterns hit fewer (pipeline/audit_model.py). Strokes gained in Rounds are against your level's curve. The short-game setting adds strokes to every chip, pitch and bunker shot inside 50 yards — the number the go/lay-up verdicts turn on. The three desert numbers are what happens to your desert balls — played as they lie (rough plus 0.4), dropped, or lost — an estimate (60 / 25 / 15 of a hundred) until your marked rounds say otherwise; they are read as shares, so they need not sum to 100.</p>
@@ -2018,6 +2141,7 @@ Driver, 302, 328
     <p class="help">Results are deterministic for a given setting (the same random draws every time), so small differences between options are real differences in the model, not noise between runs.</p>
     <p class="help"><button id="resetAll">Reset every setting</button> <span style="color:var(--mute)">Rounds and their scores are managed on the Rounds view (export, import, delete).</span></p>
   </section>`;
+  fitSelects(el);   // each select as wide as its longest option (session Q's eighth lane)
   { const e = $("#s_oob"); if (e) e.addEventListener("change", () => { state.P.oob = e.checked; saveP(); renderSettings(); }); }   // out of bounds priced (session P)
   { const e = $("#s_own"); if (e) e.addEventListener("change", () => { state.P.own_ground = e.checked; saveP(); renderSettings(); }); }   // the tee pick on the hole's own ground (session R, R-E1)
   const bind = (id, key, parse=parseFloat) => { const e = $("#"+id); e.addEventListener("change", () => { state.P[key] = parse(e.value); if (key==="aim_max") state.P.aim_min = -state.P.aim_max; saveP(); renderSettings(); }); };
