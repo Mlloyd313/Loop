@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="1c6277751d">
+<meta name="loop-build" content="77f3761e6f">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -257,6 +257,7 @@ details.more>summary::marker{color:var(--mute)}
 .pinrow .pintxt button{padding:1px 8px;font-size:12px;margin-left:2px}
 @media (pointer:coarse){.pingrid{grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,30px)}.pingrid button{font-size:14px}}
 .pocket{display:none}
+.ybook{display:none}   /* the yardage book (session P): built on demand, shown only when it is what is being printed */
 @media print{
   header,.mapwrap,.maplegend,.progress,nav,.noprint,.callbar{display:none!important}
   html,body{font-size:11px;color:#000;background:#fff}
@@ -266,6 +267,25 @@ details.more>summary::marker{color:var(--mute)}
   .pocket h1{font:700 18px var(--num);margin:0 0 4px}
   .pocket .sub{font-size:10px;color:#333;margin-bottom:6px}
   .round:not(.printing),.audit,.settings,.hole{display:none}
+  body.print-book .pocket,body.print-book main>section:not(.ybook){display:none!important}
+  body.print-book .ybook{display:block;color:#000;font:10px/1.35 var(--font)}
+  .ybp{break-after:page;page-break-after:always}
+  .ybp:last-child{break-after:auto;page-break-after:auto}
+  .ybhead{display:flex;justify-content:space-between;gap:10px;border-bottom:1.5px solid #000;padding-bottom:3px;margin-bottom:6px;font-size:9px}
+  .ybhead b{font:700 12px var(--num)}
+  .ybrow{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .ybh{min-width:0;break-inside:avoid}
+  .ybmapbox{height:6.7in;display:flex;justify-content:center;align-items:flex-start}
+  .ybmapbox canvas{max-width:100%;max-height:100%;width:auto;height:auto;border:1px solid #000}
+  .ybtt{font:700 16px var(--num);margin:5px 0 3px;display:flex;gap:8px;align-items:baseline}
+  .ybtt .sub{font:600 9.5px var(--font);color:#222}
+  .ybtxt{max-height:2.8in;overflow:hidden}
+  .ybtxt p{margin:0 0 2.5px}
+  .ybtxt .k{font-weight:700}
+  .ybtxt .lr{color:#333;font-size:9px}
+  .ybnotes{margin-top:3px}
+  .ybnotes i{display:block;border-bottom:1px solid #aaa;height:14px}
+  .ybfoot{font-size:7.5px;color:#444;margin-top:5px;border-top:1px solid #999;padding-top:2px}
 }
 /* the player (session O): one question on first open, a chip in the header, the six numbers in Settings */
 .who{font-size:13px;color:var(--ink2);border:1px solid var(--rule);border-radius:999px;padding:4px 10px;white-space:nowrap}
@@ -341,6 +361,7 @@ details.more>summary::marker{color:var(--mute)}
   <section class="audit" id="viewAudit" hidden></section>
   <section class="settings" id="viewSettings" hidden></section>
   <section class="pocket" id="pocket"></section>
+  <section class="ybook" id="ybook"></section>
 </main>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="ask" id="askPlayer" hidden role="dialog" aria-modal="true" aria-labelledby="askTitle">
@@ -1136,7 +1157,7 @@ function renderRound(){
   html += `<div class="kpis"><div class="kpi engine"><div class="v num">${nE?fmt(engE,1):"–"}</div><div class="l">model strokes on the ${nE} priced holes (par ${parE}) playing the engine's lines</div></div>
     <div class="kpi plan"><div class="v num">${nPlan?sgn(planE,1):"–"}</div><div class="l">what the plan's tee clubs cost per round where they differ (${nPlan} holes with a plan club)</div></div>
     <div class="kpi"><div class="v num">${rows.filter(x=>x.r&&x.r.goLay&&x.r.goLay.delta>0.1).length}</div><div class="l">par 5s where going for the green beats laying up by more than 0.1</div></div></div>`;
-  html += IN_ARTIFACT ? `<div class="noprint" style="margin:0 0 10px;font-size:12.5px;color:var(--mute)">The pocket card (one printable page per course) prints from the copy in Documents\\Claude\\The Forge\\Loop.</div>` : `<div class="noprint" style="margin:0 0 10px"><button id="printPocket">Print the pocket card</button> <span style="font-size:12.5px;color:var(--mute)">one page: club, line, plays-like and the call for every hole</span></div>`;
+  html += IN_ARTIFACT ? `<div class="noprint" style="margin:0 0 10px;font-size:12.5px;color:var(--mute)">The pocket card (one page) and the yardage book (two holes a page) print from the phone site or the copy in Documents\\Claude\\The Forge\\Loop; this frame has no print dialog.</div>` : `<div class="noprint" style="margin:0 0 10px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center"><span><button id="printPocket">Print the pocket card</button> <span style="font-size:12.5px;color:var(--mute)">one page: club, line, plays-like and the call for every hole</span></span><span><button id="printBook" ${done < c.holes.length ? "disabled" : ""}>Print the yardage book</button> <span style="font-size:12.5px;color:var(--mute)">${done < c.holes.length ? "once every hole is priced" : "two holes a page: the aerial with the yardages, the hazards' carries, the green and the call"}</span></span></div>`;
   const rr = roundForCourse(c, false); const scoreOf = h => rr && rr.holes && rr.holes[h.hole] && rr.holes[h.hole].score != null ? rr.holes[h.hole].score : "";
   let cards = `<div class="cards">`;   // the pocket card on a phone (session N): one row per hole, the same numbers as the table, no sideways scroll
   html += `<div class="tablewrap"><table><thead><tr><th class="n">Hole</th><th class="n">Par</th><th class="n">Yards</th><th>Tee shot</th><th class="n">Expected</th><th>Plan's club</th><th class="n">Costs</th><th class="n">Leaves · plays</th><th>Approach</th><th>Second shot</th><th class="n" title="${rr ? esc(roundLabel(rr)) : "typing a score starts a scores-only round for today"}">Your score${rr ? `<br><span style="font-weight:400">${esc(rr.date||"")}</span>` : ""}</th></tr></thead><tbody>`;
@@ -1166,7 +1187,9 @@ function renderRound(){
   $$("[data-goview]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); setView(a.dataset.goview); }));
   $$(".score").forEach(i => i.addEventListener("change", ev => { const v = ev.target.value.trim(); const hn = +ev.target.dataset.hole; const r2 = roundForCourse(c, true); r2.holes = r2.holes || {}; if (!r2.holes[hn]) { r2.holes[hn] = { shots: [], score: null }; stampPin(r2, hn); } r2.holes[hn].score = v === "" ? null : +v; invalidateLedger(r2.id, hn); saveRounds(); renderRound(); }));
   const psc = $("#pinSheetClear"); if (psc) psc.addEventListener("click", () => clearSheet(c));
-  const pb = $("#printPocket"); if (pb) pb.addEventListener("click", () => { renderPocket(); window.print(); });
+  const pb = $("#printPocket"); if (pb) pb.addEventListener("click", () => { document.body.classList.remove("print-book"); renderPocket(); window.print(); });
+  const bb = $("#printBook"); if (bb) bb.addEventListener("click", async () => { const t = bb.textContent; bb.disabled = true; bb.textContent = "Preparing the book…";
+    try { await renderBook(c); document.body.classList.add("print-book"); window.print(); } finally { bb.textContent = t; bb.disabled = false; } });
 }
 function renderPocket(){
   const c = course(); const R = getResults(c); const nS = nSheet(c); let html = `<h1>${c.club} — ${c.name} · ${c.tees}</h1><div class="sub">Loop pocket card · ${windText()}, ${state.P.temp_f}°F, ${state.P.setting}, ${pinText()}${nS ? ` (today's own pin on ${nS} hole${nS === 1 ? "" : "s"}: the Pin column)` : ""} · generated ${new Date().toLocaleDateString()}</div><table><thead><tr><th>#</th><th>Par</th><th>Yds</th>${nS ? "<th>Pin</th>" : ""}<th>Tee</th><th>Line</th><th>Then</th><th>Call</th><th>Plan says</th></tr></thead><tbody>`;
@@ -1177,6 +1200,154 @@ function renderPocket(){
     html += `<tr><td>${h.hole}</td><td>${h.par}</td><td>${h.card}</td>${nS ? `<td>${sp ? pinWords(sp) + (Math.round(+sp.pin_lat || 0) ? ` ${Math.abs(Math.round(+sp.pin_lat))} ${+sp.pin_lat < 0 ? "L" : "R"}` : "") : ""}</td>` : ""}<td>${tee}</td><td>${line}</td><td>${then}</td><td>${call}</td><td>${h.plan.summary?esc(h.plan.summary.replace(/^Hole \d+ — [^.]*\. ?/,"")).slice(0,110):""}</td></tr>`; }
   $("#pocket").innerHTML = html + `</tbody></table>`;
 }
+// ---------------- the yardage book (session P): the course printed two holes a page ----------------
+// Michael, 2026-10-09: "yardage book maybe being its own one off or ideally a way to print it in the loop app". Every number comes from
+// what the hole page already uses: the lie grid (the surfaces), the lidar (the elevation), the hole line and the engine's own call under
+// today's settings. Yards are straight-line from the tee unless marked "to the green" (its middle: the data's pin).
+function bookFeatures(c, h, r){
+  const H = E.decodeHole(h); E.applyPin(H, holeP(c, h)); const cell = H.cell, nx = H.nx, ny = H.ny;
+  const ovr = E.overrideFor(h); const line = ovr ? h.line.slice(0, -1).concat([ovr.pin]) : h.line; const mid = H.basePin.slice();
+  const base = i => { const v = H.lie[i]; return v >= 10 ? v - 10 : v; };
+  const at = (x, y) => { const ix = Math.floor((x - H.x0) / cell), iy = Math.floor((y + H.w) / cell); return ix < 0 || iy < 0 || ix >= nx || iy >= ny ? -1 : base(iy * nx + ix); };
+  const xy = i => [H.x0 + ((i % nx) + 0.5) * cell, -H.w + (Math.floor(i / nx) + 0.5) * cell];
+  const segs = []; let Lm = 0; for (let i = 1; i < line.length; i++) { const l = Math.hypot(line[i][0] - line[i-1][0], line[i][1] - line[i-1][1]); segs.push([line[i-1], line[i], Lm, l]); Lm += l; }
+  const ptAt = s => { for (const [a, b, s0, l] of segs) if (s <= s0 + l || b === line[line.length - 1]) { const t = l ? Math.min(1, Math.max(0, (s - s0) / l)) : 0; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; } return line[0]; };
+  const toLine = (x, y) => { let best = 1e9, side = 0; for (const [a, b, , l] of segs) { const dx = b[0] - a[0], dy = b[1] - a[1]; let t = l ? ((x - a[0]) * dx + (y - a[1]) * dy) / (l * l) : 0; t = Math.max(0, Math.min(1, t)); const d = Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy); if (d < best) { best = d; side = Math.sign(dx * (y - a[1]) - dy * (x - a[0])); } } return { d: best, side }; };
+  const yd = m => Math.round(m / YD), LY = Lm / YD;
+  // to the middle of the green, along the hole line (where the line first comes within T yards of the middle)
+  const markers = []; if (h.par !== 3) for (const T of (h.par === 5 ? [100, 150, 200, 250] : [100, 150, 200])) { if (T > LY - 40) continue;
+    for (let s = 0; s <= Lm; s += 1) { const p = ptAt(s); if (Math.hypot(p[0] - mid[0], p[1] - mid[1]) <= T * YD) { markers.push({ yd: T, x: p[0], y: p[1] }); break; } } }
+  // the green: its depth along the approach (the last segment), the pin's place on it, the hazards around it
+  // (out from the pin each way while the cells are green, stepping over a gap of up to 6 m: an imagery-read green can have a hole in it)
+  const edge = sg => { let last = 0; for (let k = 1; k <= 120; k++) { const t = sg * k * 0.5; if (at(H.pin[0] + H.dir[0] * t, H.pin[1] + H.dir[1] * t) === 3) last = t; else if (Math.abs(t - last) > 6) break; } return last; };
+  const gf = edge(-1), gb = edge(1); const green = gb - gf >= 4 ? { depth: yd(gb - gf + 0.5), front: yd(0.25 - gf), back: yd(gb + 0.25) } : null;
+  // hazards: sand and water blobs (4-connected cells of the grid)
+  const seen = new Uint8Array(nx * ny); const blobs = [];
+  for (let i0 = 0; i0 < nx * ny; i0++) { const k = base(i0); if (seen[i0] || (k !== 4 && k !== 5)) continue;
+    const q = [i0]; seen[i0] = 1; const cells = []; while (q.length) { const i = q.pop(); cells.push(i); const ix = i % nx, iy = (i - ix) / nx;
+      for (const [jx, jy] of [[ix - 1, iy], [ix + 1, iy], [ix, iy - 1], [ix, iy + 1]]) { if (jx < 0 || jy < 0 || jx >= nx || jy >= ny) continue; const j = jy * nx + jx; if (!seen[j] && base(j) === k) { seen[j] = 1; q.push(j); } } }
+    if (cells.length < 5) continue;
+    let reach = 1e9, carry = 0, dl = 1e9, side = 0, dp = 1e9, dpf = 0, sx = 0, sy = 0, near = null;
+    for (const i of cells) { const [x, y] = xy(i); const d0 = Math.hypot(x, y); if (d0 < reach) reach = d0; if (d0 > carry) carry = d0; const L = toLine(x, y); if (L.d < dl) { dl = L.d; side = L.side; near = [x, y]; } const p = Math.hypot(x - mid[0], y - mid[1]); if (p < dp) dp = p; if (p > dpf) dpf = p; sx += x; sy += y; }
+    blobs.push({ kind: k === 4 ? "sand" : "water", n: cells.length, reach: yd(reach), carry: yd(carry), line: yd(dl), side, toGreen: yd(dp), toGreenFar: yd(dpf), cx: sx / cells.length, cy: sy / cells.length, near }); }
+  const land = r && r.kind === "tee" && r.landing ? Math.hypot(r.landing[0], r.landing[1]) / YD : 1e9;
+  const tee = h.par === 3 ? [] : blobs.filter(b => b.line <= 40 && b.reach >= 120 && b.reach <= LY - 40 && b.toGreen > 30).sort((a, b) => a.reach - b.reach).slice(0, 7)
+    .map(b => Object.assign(b, { lay: h.par === 5 && b.reach > land + 30 }));   // past the drive on a par 5: the lay-up's numbers, to the green
+  const around = blobs.filter(b => b.toGreen <= 30).map(b => { const vx = b.cx - mid[0], vy = b.cy - mid[1]; const al = (vx * H.dir[0] + vy * H.dir[1]) / YD, la = (H.dir[0] * vy - H.dir[1] * vx) / YD;
+    const w = [al < -8 ? "short" : al > 8 ? "long" : "", la < -6 ? "left" : la > 6 ? "right" : ""].filter(Boolean).join("-") || "beside"; return { kind: b.kind, where: w, b }; });
+  // the carry from the tee on the line the engine plays (par 3s: at the pin): the far edge of the last desert, water, waste or scrub
+  // before the first fairway (par 3s: the green), when it is 100 yd or more out; then ground that crosses the hole line beyond the fairway's start
+  const HZ = k => k === 0 || k === 5 || k === 7 || k === 8; let carry = null;
+  { const aim = r && r.kind === "tee" ? r.options[0].best.aim * Math.PI / 180 : Math.atan2(H.pin[1], H.pin[0]); const far = r && r.kind === "tee" && r.landing ? Math.hypot(r.landing[0], r.landing[1]) : Math.hypot(H.pin[0], H.pin[1]);
+    const goal = h.par === 3 ? 3 : 1; let last = null, kind = null; for (let s = 15 * YD; s <= far; s += 0.5) { const x = Math.cos(aim) * s, y = Math.sin(aim) * s, k = at(x, y); if (k === goal && s >= 80 * YD) break; if (HZ(k)) { last = s; kind = k; } }   // a strip of short grass by the tee is not the fairway
+    if (last != null && last / YD >= 100) carry = { yd: yd(last + 0.5), kind: kind === 5 ? "water" : "desert", x: Math.cos(aim) * last, y: Math.sin(aim) * last }; }
+  // across the line: from where the fairway starts past the carry (and 150 yd out) to the green's front — the ground a drive or a lay-up must clear
+  let fw = null; const from = Math.max(150 * YD, carry ? carry.yd * YD + 5 : 0); for (let s = from; s < Lm; s += 1) { const p = ptAt(s); if (at(p[0], p[1]) === 1) { fw = s; break; } }
+  const cross = []; if (fw != null) { let run = null; const end = Lm - (green ? (green.front + 4) * YD : 15 * YD);
+    for (let s = fw; s <= end; s += 1) { const p = ptAt(s), k = at(p[0], p[1]); const hz = k === 0 || k === 5 || k === 7 || k === 8;
+      if (hz && !run) run = { s0: s, k }; if ((!hz || s + 1 > end) && run) { if (s - run.s0 >= 6 * YD) { const p0 = ptAt(run.s0), p1 = ptAt(s); cross.push({ kind: run.k === 5 ? "water" : run.k === 8 ? "scrub" : run.k === 7 ? "waste" : "desert", from: yd(Math.hypot(p0[0], p0[1])), to: yd(Math.hypot(p1[0], p1[1])), toGreen: yd(Math.hypot(p1[0] - mid[0], p1[1] - mid[1])), x: (p0[0] + p1[0]) / 2, y: (p0[1] + p1[1]) / 2 }); } run = null; } } }
+  return { H, line, mid, markers, green, tee, around, carry, cross: cross.slice(0, 3), dz: Math.round(H.pinFt - h.tee_ft), LY: Math.round(LY), pinYd: yd(Math.hypot(H.pin[0], H.pin[1])), at, base };
+}
+function bookAerial(c, h){
+  const im = LIVE_TILES ? null : loadImg(h); const live = () => liveAerial(c, h, null); const local = () => im && im.complete && im.naturalWidth;
+  return { ready(){ if (local()) return true; if (im && !im.complete) return false; const L = live(); return L.ready && L.pending === 0; },
+    draw(ctx){ if (local()) ctx.drawImage(im, 0, 0); else { const L = live(); if (L.ready) ctx.drawImage(L.el, 0, 0); else { ctx.fillStyle = "#6b6e66"; ctx.fillRect(0, 0, h.frame.W, h.frame.H); } } } };
+}
+function bookMap(cv, c, h, r, F, A, scale){
+  const f = h.frame; cv.width = Math.round(f.W * scale); cv.height = Math.round(f.H * scale); const ctx = cv.getContext("2d"); ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  const px = (x, y) => frameToPx(h, x, y); const H = F.H; const cell = H.cell; const NUM = getComputedStyle(document.body).getPropertyValue("--num") || "sans-serif";
+  A.draw(ctx);
+  // the green, the sand and the water outlined from the grid (they print in black and white too)
+  for (const [k, col] of [[3, "#ffffff"], [4, "#ffe28a"], [5, "#8fd3ff"]]) { ctx.beginPath();
+    for (let iy = 0; iy < H.ny; iy++) for (let ix = 0; ix < H.nx; ix++) { const i = iy * H.nx + ix; if (F.base(i) !== k) continue;
+      const xa = H.x0 + ix * cell, xb = xa + cell, ya = -H.w + iy * cell, yb = ya + cell; const m = (jx, jy) => jx >= 0 && jy >= 0 && jx < H.nx && jy < H.ny && F.base(jy * H.nx + jx) === k;
+      const seg = (x1, y1, x2, y2) => { const [a1, b1] = px(x1, y1), [a2, b2] = px(x2, y2); ctx.moveTo(a1, b1); ctx.lineTo(a2, b2); };
+      if (!m(ix - 1, iy)) seg(xa, ya, xa, yb); if (!m(ix + 1, iy)) seg(xb, ya, xb, yb); if (!m(ix, iy - 1)) seg(xa, ya, xb, ya); if (!m(ix, iy + 1)) seg(xa, yb, xb, yb); }
+    ctx.lineCap = "round"; ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.lineWidth = 2.6; ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.stroke(); }
+  // out of bounds, when priced: white stakes along the edge of the layer (as on the hole page)
+  if (state.P.oob) { ctx.save(); ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.lineWidth = .6; const ob = (ix, iy) => ix >= 0 && iy >= 0 && ix < H.nx && iy < H.ny && H.lie[iy * H.nx + ix] >= 10;
+    for (let iy = 1; iy < H.ny - 1; iy++) for (let ix = 1; ix < H.nx - 1; ix++) { if (!ob(ix, iy) || ((ix + iy) & 1) || (ob(ix - 1, iy) && ob(ix + 1, iy) && ob(ix, iy - 1) && ob(ix, iy + 1))) continue;
+      const [a1, b1] = px(H.x0 + (ix + .5) * cell, -H.w + (iy + .5) * cell); ctx.beginPath(); ctx.arc(a1, b1, 1.6, 0, 7); ctx.fill(); ctx.stroke(); } ctx.restore(); }
+  const label = (txt, x, y, opts = {}) => { ctx.save(); ctx.font = `bold ${opts.size || 11}px ${NUM}`; const tw = ctx.measureText(txt).width; const bx = opts.align === "right" ? x - tw - 6 : opts.align === "center" ? x - tw / 2 - 3 : x;
+    ctx.fillStyle = opts.bg || "rgba(0,0,0,.72)"; ctx.fillRect(bx, y - 8, tw + 6, 15); ctx.fillStyle = opts.fg || "#fff"; ctx.fillText(txt, bx + 3, y + 3.5); ctx.restore(); return tw + 6; };
+  // distance arcs from the tee
+  const [tx, ty] = px(0, 0);
+  if (h.par !== 3) { ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.setLineDash([4, 5]); ctx.lineWidth = 1;
+    for (const d of [150, 200, 250, 300]) { if (d > F.LY - 25) continue; const rp = d * YD / f.res; ctx.beginPath(); ctx.arc(tx, ty, rp, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke();
+      const cl = (6 - tx) / rp; const th = cl >= -1 ? -Math.acos(Math.max(-1, Math.min(1, cl))) : Math.PI * 1.2; const ax = Math.max(6, tx + rp * Math.cos(th)), ay = ty + rp * Math.sin(th);   // where the arc meets the map's left edge
+      if (ay > 12) label(String(d), ax, ay - 9, { size: 10, bg: "rgba(0,0,0,.6)" }); }
+    ctx.restore(); }
+  // the hole line
+  ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 1.5; ctx.beginPath(); F.line.forEach((p, i) => { const [a, b] = px(p[0], p[1]); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }); ctx.stroke(); ctx.restore();
+  // the engine's call: the window, the line, the landing; the approach
+  const pin = F.H.pin; const [qx, qy] = px(pin[0], pin[1]); let landLab = null;   // the landing's label goes on last, over the hazards' labels
+  if (r && r.kind === "tee") { const o = r.options[0]; const carryM = Math.hypot(r.landing[0], r.landing[1]);
+    ctx.beginPath(); ctx.moveTo(tx, ty); for (let a = o.window[0]; a <= o.window[1]; a += 1) { const rad = a * Math.PI / 180; const [qx2, qy2] = px(Math.cos(rad) * carryM, Math.sin(rad) * carryM); ctx.lineTo(qx2, qy2); } ctx.closePath(); ctx.fillStyle = "rgba(200,16,46,.16)"; ctx.fill();
+    const [lx, ly] = px(r.landing[0], r.landing[1]); ctx.save(); ctx.strokeStyle = "#c8102e"; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(lx, ly); ctx.stroke();
+    ctx.setLineDash([6, 5]); ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(qx, qy); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = "#c8102e"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(lx, ly, 4.5, 0, 7); ctx.fill(); ctx.stroke();
+    landLab = [`${o.club} ${Math.round(carryM / YD)} · ${Math.round(o.best.rem)} in`, lx + 8, ly]; }
+  else if (r && r.kind === "par3") { ctx.save(); ctx.strokeStyle = "#c8102e"; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(qx, qy); ctx.stroke(); ctx.restore(); }
+  // to the middle of the green, along the line
+  for (const m of F.markers) { const [a, b] = px(m.x, m.y); ctx.fillStyle = "#fff"; ctx.strokeStyle = "#000"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(a, b, 3.5, 0, 7); ctx.fill(); ctx.stroke(); label(String(m.yd), a + 6, b, { bg: "rgba(255,255,255,.92)", fg: "#000", size: 10 }); }
+  // the tee shot's hazards: reach and carry from the tee; ground across the line
+  let nh = 0; for (const b of F.tee) { const [a, bb] = px(b.cx, b.cy); const right = b.side > 0; label(b.lay ? `↑${b.toGreenFar}–${b.toGreen}` : `${b.reach}–${b.carry}`, right ? a + 6 : a - 6, bb, { align: right ? "left" : "right", size: 10, bg: b.kind === "water" ? "rgba(20,70,140,.88)" : "rgba(120,90,20,.88)" }); nh++; }
+  for (const x of F.cross) { const [a, b] = px(x.x, x.y); label(`${x.kind} ${x.from}–${x.to}`, a, b, { align: "center", size: 10, bg: "rgba(90,60,20,.85)" }); nh++; }
+  if (F.carry) { const [a, b] = px(F.carry.x, F.carry.y); ctx.save(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a - 7, b); ctx.lineTo(a + 7, b); ctx.stroke(); ctx.restore(); label(`carry ${F.carry.yd}`, a + 10, b, { size: 10, bg: "rgba(90,60,20,.88)" }); nh++; }
+  cv.dataset.hazards = nh;
+  if (landLab) label(landLab[0], landLab[1], landLab[2], { bg: "rgba(200,16,46,.92)" });
+  // the pin and the tee
+  ctx.save(); ctx.fillStyle = "#fff"; ctx.strokeStyle = "#c8102e"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(qx, qy, 4.5, 0, 7); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(qx, qy - 5); ctx.lineTo(qx, qy - 24); ctx.stroke();
+  ctx.fillStyle = "#c8102e"; ctx.beginPath(); ctx.moveTo(qx, qy - 24); ctx.lineTo(qx + 11, qy - 19.5); ctx.lineTo(qx, qy - 15); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.strokeStyle = "#17191c"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.rect(tx - 5, ty - 5, 10, 10); ctx.fill(); ctx.stroke(); ctx.restore();
+  // north and a 50-yd scale
+  ctx.save(); const nb = (h.bearing || 0) * Math.PI / 180; ctx.translate(22, 26); ctx.rotate(-nb); ctx.strokeStyle = "#fff"; ctx.fillStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 12); ctx.lineTo(0, -12); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, -15); ctx.lineTo(5, -5); ctx.lineTo(-5, -5); ctx.fill(); ctx.rotate(nb); ctx.font = "bold 10px sans-serif"; ctx.fillText("N", 8, 4); ctx.restore();
+  const sc = 50 * YD / f.res; ctx.save(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(f.W - sc - 10, f.H - 12); ctx.lineTo(f.W - 10, f.H - 12); ctx.stroke(); ctx.fillStyle = "#fff"; ctx.font = "bold 10px sans-serif"; ctx.fillText("50 yd", f.W - sc - 10, f.H - 16); ctx.restore();
+  cv.dataset.drawn = A.ready() ? "1" : "0";
+}
+function bookText(c, h, r, F){
+  const sp = sheetPin(c, h); const pinW = sp ? pinWords(sp) : state.P.pin + ((+state.P.pin_lat || 0) ? `, tucked ${Math.abs(+state.P.pin_lat)} ${+state.P.pin_lat < 0 ? "left" : "right"}` : "");
+  const odds = o => ["fairway", "rough", "sand", "water", "desert", "oob"].filter(k => (o[k] || 0) >= 0.01).map(k => `${k === "oob" ? "out of bounds" : k} ${pct(o[k])}`).join(" · ");
+  let t = `<div class="ybtt">${h.hole}<span class="sub">Par ${h.par} · ${h.card} yd${h.si ? ` · SI ${h.si}` : ""}${F && F.dz ? ` · green ${Math.abs(F.dz)} ft ${F.dz < 0 ? "below" : "above"} the tee` : ""}</span></div>`;
+  if (!r) return t + `<p>${h.nodata ? "No measured line for this hole: not priced." : "Not priced yet."}</p>`;
+  if (r.kind === "tee") { const o = r.options[0], b = o.best;
+    t += `<p><span class="k">Tee:</span> <b>${o.club}</b> ${aimShort(b.aim)} (window ${aimShort(o.window[0])}–${aimShort(o.window[1])}): lands ${Math.round(Math.hypot(r.landing[0], r.landing[1]) / YD)}, leaves ${Math.round(b.rem)} (plays ${Math.round(b.plays)})${r.approach && r.approach.best ? ` → <b>${r.approach.club}</b>, on the green ${pct(r.approach.best.odds.green)}` : ""}</p>`;
+    t += `<p><span class="k">Off the tee:</span> ${odds(b.odds)}</p>`;
+    if (r.goLay && r.goLay.delta != null) t += `<p><span class="k">Second shot:</span> ${r.goLay.delta > 0.05 ? `go — ${fmt(r.goLay.delta)} better than laying up` : `lay up to ${r.goLay.lay.leave} — ${fmt(-r.goLay.delta)} better than going`}</p>`;
+    else if (r.goLay && r.goLay.lay) t += `<p><span class="k">Second shot:</span> the green is out of reach — lay up to ${r.goLay.lay.leave}${r.goLay.lay.club ? ` (${r.goLay.lay.club})` : ""}</p>`; }
+  else if (r.kind === "par3") { const a = r.approach; t += `<p><span class="k">Tee:</span> <b>${a.club}</b>, plays ${Math.round(a.plays)}${a.best && !r.curveOnly ? ` · on the green ${pct(a.best.odds.green)}${odds(a.best.odds) ? ` · ${odds(a.best.odds)}` : ""}` : ""}</p>`; }
+  if (F) { const bits = [];
+    if (F.carry) bits.push(`carry ${F.carry.yd} to clear the ${F.carry.kind}`);
+    for (const b of F.tee.filter(b => !b.lay)) bits.push(`${b.kind} ${b.side > 0 ? "right" : b.side < 0 ? "left" : "on the line"} ${b.reach}–${b.carry}`);
+    const lay = F.tee.filter(b => b.lay).map(b => `${b.kind} ${b.side > 0 ? "right" : b.side < 0 ? "left" : "on the line"} ${b.toGreenFar}–${b.toGreen}`);
+    for (const x of F.cross) bits.push(`${x.kind} across the line ${x.from}–${x.to} (${x.toGreen} to the green)`);
+    if (bits.length) t += `<p><span class="k">From the tee:</span> ${bits.join(" · ")}</p>`;
+    if (lay.length) t += `<p><span class="k">Laying up, to the green:</span> ${lay.join(" · ")}</p>`;
+    if (F.green) t += `<p><span class="k">Green:</span> ${F.green.depth} yd deep · the pin (${esc(pinW)}) ${F.green.front} from the front, ${F.green.back} from the back${h.par === 3 ? ` (from the tee: front ${F.pinYd - F.green.front}, pin ${F.pinYd}, back ${F.pinYd + F.green.back})` : ""}${F.around.length ? ` · ${["water", "sand"].filter(k => F.around.some(a => a.kind === k)).map(k => `${k} ${[...new Set(F.around.filter(a => a.kind === k).map(a => a.where))].join(", ")}`).join("; ")}` : ""}</p>`; }
+  const pc = planClubFor(c, h); t += `<p><span class="k">Model:</span> ${fmt(r.E)} expected${pc && r.kind === "tee" ? ` · the plan's club: ${pc}${r.planE != null && pc !== r.options[0].club ? ` (${sgn(r.planE - r.E)})` : " (agrees)"}` : ""}</p>`;
+  const lr = c.local_rules || {}; const rules = [h.desert_rule === "penalty_area" ? "Desert: a penalty area by the club's card — a stroke and a drop at the grass line" : `Desert: general area (the Rules${lr.card ? "; the card has no desert rule" : ""})`];
+  if (lr.oob) rules.push(`Out of bounds: ${esc(lr.oob.replace(/^Out of Bounds is defined by /i, "").replace(/^Out-of-Bounds areas are clearly marked by /i, "").replace(/\.$/, ""))}${state.P.oob ? " (priced: the stakes on the map)" : ""}`);
+  else if (state.P.oob && h.src && h.src.oob && !h.src.oob.startsWith("none")) rules.push("Out of bounds: the stakes on the map (priced)");
+  t += `<p class="lr">${rules.join(". ")}.</p><div class="ybnotes"><i></i><i></i><i></i></div>`;
+  return t;
+}
+async function renderBook(c){
+  const R = getResults(c); const el = $("#ybook"); const nS = nSheet(c); const SCALE = 1.5;
+  const head = `<div class="ybhead"><span><b>${esc(c.club === c.name ? c.name : c.club + " — " + c.name)}</b> · ${esc(c.tees)} · par ${c.par} · ${c.yards.toLocaleString()} yd</span><span>Loop yardage book · ${windText()}, ${state.P.temp_f}°F, ${state.P.setting}, ${pinText()}${nS ? ` (today's own pin on ${nS} hole${nS === 1 ? "" : "s"})` : ""} · for the ${esc(playerLabel())} golfer (Driver ${Math.round((clubsAsPlayed().find(k => k.name === "Driver") || {}).carry || 0)} carry) · ${new Date().toLocaleDateString()}</span></div>`;
+  const foot = `<div class="ybfoot">Yards are from the tee, straight-line, unless they say "to the green" (white dots and ↑: to its middle). Hazards: reach–carry from the tee; past the drive on a par 5, ↑ far edge–near edge to the green. Red: the engine's line and window under these conditions; its numbers are model strokes that compare choices, not a score prediction. Imagery © Esri, Maxar, Earthstar Geographics and the GIS user community · map data © OpenStreetMap contributors · elevation USGS 3DEP.</div>`;
+  const blocks = c.holes.map(h => { const r = R.holes[h.hole] || null; return { h, r, F: h.nodata || !h.frame ? null : bookFeatures(c, h, r) }; });
+  let html = ""; for (let i = 0; i < blocks.length; i += 2) { html += `<div class="ybp">${head}<div class="ybrow">`;
+    for (const b of blocks.slice(i, i + 2)) html += `<div class="ybh" data-hole="${b.h.hole}">${b.F ? `<div class="ybmapbox"><canvas id="yb_${b.h.hole}"></canvas></div>` : ""}<div class="ybtxt">${bookText(c, b.h, b.r, b.F)}</div></div>`;
+    html += `</div>${foot}</div>`; }
+  el.innerHTML = html;
+  const items = blocks.filter(b => b.F).map(b => ({ ...b, cv: $("#yb_" + b.h.hole), A: bookAerial(c, b.h), done: false }));
+  const t0 = Date.now();
+  return new Promise(res => { const tick = () => { let all = true;
+      for (const it of items) { if (it.done) continue; if (it.A.ready()) { bookMap(it.cv, c, it.h, it.r, it.F, it.A, SCALE); it.done = true; } else { if (!it.cv.width || it.cv.dataset.drawn !== "0") bookMap(it.cv, c, it.h, it.r, it.F, it.A, SCALE); all = false; } }
+      if (all || Date.now() - t0 > 20000) { el.dataset.ready = all ? "1" : "partial"; res(all); } else setTimeout(tick, 120); };
+    tick(); });
+}
+window.addEventListener("afterprint", () => document.body.classList.remove("print-book"));
 // ---------------- rounds view ----------------
 let roundsRerender = null;
 function renderRounds(){
