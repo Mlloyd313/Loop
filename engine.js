@@ -2,15 +2,17 @@
    Frame: metres, +x toward the pin, +y right. Yards in the API. */
 (function () {
   const YD = 0.9144;
-  const L = { DESERT: 0, FAIRWAY: 1, ROUGH: 2, GREEN: 3, SAND: 4, WATER: 5, OGREEN: 6, WASTE: 7, SCRUB: 8, TEE: 9 };
+  const L = { DESERT: 0, FAIRWAY: 1, ROUGH: 2, GREEN: 3, SAND: 4, WATER: 5, OGREEN: 6, WASTE: 7, SCRUB: 8, TEE: 9, OB: 10 };   // OB: out of bounds (session P) — stroke and distance
   const D = window.LOOP_DATA;
+  if (D.defaults.oob == null) D.defaults.oob = false;   // out of bounds priced (session P): off by default
   if (D.defaults.pin_lat == null) D.defaults.pin_lat = 0;   // the tucked pin (session L): data.js built before it carries the default from its next rebuild
   if (D.defaults.desert_play == null) Object.assign(D.defaults, { desert_play: 0.6, desert_unplayable: 0.25, desert_lost: 0.15, desert_drop_extra: 0.4 });   // the desert by the Rules (session L, D-L11)
   // from-lie effects on the next shot: dispersion multiplier, carry factor, penalty strokes before the shot
   // (desert's pen is the lie's extra for a ball you are playing from the desert — found, playable, the same as scrub; the penalty cases live in
   // price(): the desert shares — session L, on Michael's word that the desert is general area everywhere, D-L11)
   const LIEFX = { 0: { disp: 1.3, carry: 0.96, pen: 0.4 }, 1: { disp: 1, carry: 1, pen: 0 }, 2: { disp: 1.3, carry: 0.96, pen: 0 }, 3: { disp: 1, carry: 1, pen: 0 }, 4: { disp: 1.6, carry: 0.92, pen: 0 },
-                  5: { disp: 1.3, carry: 0.96, pen: 1 }, 6: { disp: 1.3, carry: 0.96, pen: 0 }, 7: { disp: 1.6, carry: 0.92, pen: 0 }, 8: { disp: 1.3, carry: 0.96, pen: 0.4 }, 9: { disp: 1, carry: 1, pen: 0 } };
+                  5: { disp: 1.3, carry: 0.96, pen: 1 }, 6: { disp: 1.3, carry: 0.96, pen: 0 }, 7: { disp: 1.6, carry: 0.92, pen: 0 }, 8: { disp: 1.3, carry: 0.96, pen: 0.4 }, 9: { disp: 1, carry: 1, pen: 0 },
+                  10: { disp: 1.3, carry: 0.96, pen: 0.4 } };   // OB: a ball someone plays from a spot the map calls out of bounds is in bounds there — a found desert ball
 
   // ---------- RNG (deterministic per run) ----------
   function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -38,7 +40,7 @@
   function decodeHole(h) {
     if (h._dec) return h._dec;
     const g = h.grid; const lie = new Uint8Array(g.nx * g.ny); let p = 0;
-    for (const run of g.rle.split(",")) { if (!run) continue; const v = +run[0]; const n = parseInt(run.slice(1), 16); lie.fill(v, p, p + n); p += n; }
+    for (const run of g.rle.split(",")) { if (!run) continue; const v = parseInt(run[0], 36); const n = parseInt(run.slice(1), 16); lie.fill(v, p, p + n); p += n; }
     const e = h.elev; const raw = atob(e.b64); const z = new Float32Array(e.nx * e.ny);
     for (let i = 0; i < z.length; i++) z[i] = e.lo + raw.charCodeAt(i) * e.scale;
     let depth = 25 * YD; if (h.polys.own_green) { let mn = 1e9, mx = -1e9; for (const [x] of h.polys.own_green) { if (x < mn) mn = x; if (x > mx) mx = x; } depth = mx - mn; }
@@ -60,7 +62,7 @@
       if (ln.length <= 2) { a = ln[0]; b = basePin; }
     }
     const dl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-    const H = { lie, z, nx: g.nx, ny: g.ny, cell: g.cell, enx: e.nx, eny: e.ny, ecell: e.cell, x0: h.frame.x0, w: h.frame.w, basePin, pin: basePin.slice(), dir: [(b[0] - a[0]) / dl, (b[1] - a[1]) / dl], pinFt, teeFt: h.tee_ft, depth, overridden };
+    const H = { lie, z, nx: g.nx, ny: g.ny, cell: g.cell, enx: e.nx, eny: e.ny, ecell: e.cell, x0: h.frame.x0, w: h.frame.w, basePin, pin: basePin.slice(), dir: [(b[0] - a[0]) / dl, (b[1] - a[1]) / dl], pinFt, teeFt: h.tee_ft, depth, overridden, cardPA: h.desert_rule === "penalty_area", desertPA: h.desert_rule === "penalty_area" };   // the club's card's desert rule (session P); desertPA as priced (applyPin)
     if (overridden) { H.pinFt = zAt(H, basePin[0], basePin[1]); H.basePinFt = H.pinFt; }
     return h._dec = H;
   }
@@ -68,12 +70,15 @@
   // that line (+ right, − left, as seen from the fairway; 0 = on the line), the tucked pin (session L). The pin's elevation is the data's
   // at the base pin and the DEM's wherever the pin is moved (mirrors engine.py apply_pin).
   function applyPin(H, P) {
+    H.oob = !!P.oob;   // out of bounds priced (session P: a setting, off by default — P-E1b)
+    H.desertPA = !!H.cardPA && P.desert_by !== "rules";   // the card's desert rule unless asked to price the Rules instead (the rules block's comparison)
     if (H.basePinFt == null) H.basePinFt = H.pinFt;
     const s = P.pin === "front" ? -1 : P.pin === "back" ? 1 : 0; const d = s * H.depth / 3; const lat = (+P.pin_lat || 0) * YD;
     H.pin[0] = H.basePin[0] + H.dir[0] * d - H.dir[1] * lat; H.pin[1] = H.basePin[1] + H.dir[1] * d + H.dir[0] * lat;
     H.pinFt = (d === 0 && lat === 0) ? H.basePinFt : zAt(H, H.pin[0], H.pin[1]);
   }
-  function lieAt(H, x, y) { const ix = ((x - H.x0) / H.cell) | 0, iy = ((y + H.w) / H.cell) | 0; if (ix < 0 || ix >= H.nx || iy < 0 || iy >= H.ny) return L.DESERT; return H.lie[iy * H.nx + ix]; }
+  // out of bounds is stored over the cell's own lie (10–19, session P): priced as out of bounds only when the player turns it on (P.oob, set by applyPin)
+  function lieAt(H, x, y) { const ix = ((x - H.x0) / H.cell) | 0, iy = ((y + H.w) / H.cell) | 0; if (ix < 0 || ix >= H.nx || iy < 0 || iy >= H.ny) return L.DESERT; const v = H.lie[iy * H.nx + ix]; return v < L.OB ? v : H.oob ? L.OB : v - L.OB; }
   function zAt(H, x, y) {
     let fx = (x - H.x0) / H.ecell - 0.5, fy = (y + H.w) / H.ecell - 0.5;
     let ix = Math.floor(fx), iy = Math.floor(fy); if (ix < 0) ix = 0; if (ix > H.enx - 2) ix = H.enx - 2; if (iy < 0) iy = 0; if (iy > H.eny - 2) iy = H.eny - 2;
@@ -146,7 +151,7 @@
     const fw = lut(base, "fairway"), rg = lut(base, "rough"), sd = lut(base, "sand"), gr = lut(base, "green_ft");
     const kW = descentK(P, null, 250), kL = descentK(P, null, 200), kM = descentK(P, null, 170), kWe = descentK(P, null, 100);
     const [dp, du, dl] = desertShares(P); const dPlay = P.scrub_extra, dDrop = P.desert_drop_extra != null ? P.desert_drop_extra : P.scrub_extra;
-    let sum = 0, wsum = 0; const cnt = new Float64Array(10); const rem = new Float32Array(n), plays = new Float32Array(n);
+    let sum = 0, wsum = 0; const cnt = new Float64Array(11); const rem = new Float32Array(n), plays = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       const x = px[i], y = py[i]; const lie = lieAt(H, x, y); cnt[lie]++;
       const r = Math.hypot(x - H.pin[0], y - H.pin[1]) / YD; const dz = H.pinFt - zAt(H, x, y);
@@ -159,12 +164,15 @@
         case L.SAND: case L.WASTE: s = baseAt(sd, pl); break;
         case L.SCRUB: s = baseAt(rg, pl) + P.scrub_extra; break;
         case L.WATER: s = baseAt(rg, pl) + 1; break;
-        default: { const rd = baseAt(rg, pl); s = dp * (rd + dPlay) + du * (rd + dDrop) + du + dl; wsum += dl; }
+        case L.OB: s = 1; wsum += 1; break;   // out of bounds: stroke and distance — the penalty stroke here, the shot again in the fixed point below
+        default: { const rd = baseAt(rg, pl);
+          if (H.desertPA) s = dp * (rd + dPlay) + (du + dl) * (rd + 1);   // the club's card (session P): not played → a stroke and a drop at the grass line, no stroke and distance
+          else { s = dp * (rd + dPlay) + du * (rd + dDrop) + du + dl; wsum += dl; } }
       }
-      if (lie !== L.GREEN && r < 50) s += P.short_game_extra || 0;   // his chips, pitches and bunker shots vs the scratch curve
+      if (lie !== L.GREEN && lie !== L.OB && r < 50) s += P.short_game_extra || 0;   // his chips, pitches and bunker shots vs the scratch curve (no chip from out of bounds)
       sum += s;
     }
-    const odds = { green: cnt[L.GREEN] / n, fairway: (cnt[L.FAIRWAY] + cnt[L.TEE]) / n, rough: (cnt[L.ROUGH] + cnt[L.OGREEN]) / n, sand: (cnt[L.SAND] + cnt[L.WASTE]) / n, water: cnt[L.WATER] / n, desert: (cnt[L.DESERT] + cnt[L.SCRUB]) / n };
+    const odds = { green: cnt[L.GREEN] / n, fairway: (cnt[L.FAIRWAY] + cnt[L.TEE]) / n, rough: (cnt[L.ROUGH] + cnt[L.OGREEN]) / n, sand: (cnt[L.SAND] + cnt[L.WASTE]) / n, water: cnt[L.WATER] / n, desert: (cnt[L.DESERT] + cnt[L.SCRUB]) / n, oob: cnt[L.OB] / n };
     const res = { E: (1 + sum / n + (extra || 0)) / (1 - Math.min(0.95, wsum / n)), odds, rem: median(rem), plays: median(plays) };
     if (keep) { res.sample = []; for (let i = 0; i < Math.min(n, keep); i++) res.sample.push([px[i], py[i], lieAt(H, px[i], py[i])]); }
     return res;
@@ -184,7 +192,7 @@
       case L.SAND: case L.WASTE: s = baseAt(lut(base, "sand"), pl); break;
       case L.SCRUB: s = baseAt(lut(base, "rough"), pl) + P.scrub_extra; break;
       case L.WATER: s = baseAt(lut(base, "rough"), pl) + 1; break;
-      default: s = baseAt(lut(base, "rough"), pl) + P.scrub_extra;   // DESERT: a position you play from is a found, playable ball (the lie's extra, no penalty)
+      default: s = baseAt(lut(base, "rough"), pl) + P.scrub_extra;   // DESERT (and OB: a ball played from there is in bounds whatever the map says): a found, playable ball (the lie's extra, no penalty)
     }
     if (lie !== L.GREEN && r < 50) s += P.short_game_extra || 0;
     return { E: s, r, plays: pl, dz, lie };
@@ -269,11 +277,13 @@
         for (const key in buckets) {
           const b = buckets[key]; const m = b.pts.length; const cx = b.pts.reduce((s, p) => s + p[0], 0) / m, cy = b.pts.reduce((s, p) => s + p[1], 0) / m;
           const lie = b.lie;
+          if (lie === L.OB) { Esum += 1 * m; Wsum += m; shares.oob = (shares.oob || 0) + m / n; continue; }   // out of bounds: the penalty stroke, then the lay-up again
           const a = approach(h, [cx, cy], P, altf, { n: 250, keep: 0, lats: [-6, 0, 6], depths: [0], fromLie: lie });
           let Eb = a.best ? a.best.E : 1 + a.curveRough + a.fromPen; // wedge from the bucket centre, best of three aims; the from-lie extra (water's penalty stroke, scrub's and desert's 0.4) is inside
           if (lie === L.SAND || lie === L.WASTE) Eb += Math.max(0, baseAt(lut(base, "sand"), a.plays) - baseAt(lut(base, "fairway"), a.plays));
           else if (lie === L.ROUGH || lie === L.OGREEN || lie === L.DESERT || lie === L.WATER || lie === L.SCRUB) Eb += Math.max(0, baseAt(lut(base, "rough"), a.plays) - baseAt(lut(base, "fairway"), a.plays));
-          if (lie === L.DESERT) { const dDrop = P.desert_drop_extra != null ? P.desert_drop_extra : P.scrub_extra; Eb = dp * Eb + du * (1 + Eb - P.scrub_extra + dDrop) + dl * 1; Wsum += dl * m; }   // found and played, dropped (one more, on desert ground), lost (the lay-up again)
+          if (lie === L.DESERT && H.desertPA) Eb = dp * Eb + (du + dl) * (1 + Eb - P.scrub_extra);   // the card's rule: a ball not played is a stroke and a drop at the grass line
+          else if (lie === L.DESERT) { const dDrop = P.desert_drop_extra != null ? P.desert_drop_extra : P.scrub_extra; Eb = dp * Eb + du * (1 + Eb - P.scrub_extra + dDrop) + dl * 1; Wsum += dl * m; }   // found and played, dropped (one more, on desert ground), lost (the lay-up again)
           Esum += Eb * m;
           const k2 = lie === L.FAIRWAY || lie === L.TEE ? "fairway" : (lie === L.SAND || lie === L.WASTE) ? "sand" : lie === L.WATER ? "water" : (lie === L.DESERT || lie === L.SCRUB) ? "desert" : lie === L.GREEN ? "green" : "rough";
           shares[k2] += m / n;
@@ -296,7 +306,7 @@
   // (the same seeded simulation); the corridor is searched within ±10° of the fairway's own line (the landing area a golfer
   // would look at, not another hole's). The rule: the longest club whose corridor is at least minWidth yards and is not crossed; failing all,
   // the widest uncrossed corridor, else the widest. options = teeOptions(h, P, altf) (so nothing is re-simulated).
-  const PEN_LIES = new Set([L.DESERT, L.WATER, L.SCRUB]);
+  const PEN_LIES = new Set([L.DESERT, L.WATER, L.SCRUB, L.OB]);   // out of bounds added (session P)
   function corridorAt(H, aimDeg, Lm, sigmaM) {
     const a = aimDeg * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a), rx = -uy, ry = ux;
     const runAt = depthM => { const lies = []; for (let t = -160; t <= 160; t++) { lies.push(PEN_LIES.has(lieAt(H, ux * depthM + rx * t * YD, uy * depthM + ry * t * YD)) ? 0 : 1); }

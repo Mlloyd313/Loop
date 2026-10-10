@@ -23,8 +23,14 @@
   function median(a) { if (!a.length) return null; const b = a.slice().sort((x, y) => x - y); const m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; }
   function mad(a) { const m = median(a); if (m == null) return null; return median(a.map(x => Math.abs(x - m))) * 1.4826; }   // robust σ
   function round2(x) { return x == null || isNaN(x) ? null : Math.round(x * 100) / 100; }
-  function lieWord(l) { return ({ 0: "desert", 1: "fairway", 2: "rough", 3: "green", 4: "sand", 5: "water", 6: "another green", 7: "waste area", 8: "scrub", 9: "tee" })[l] || "?"; }
+  function lieWord(l) { return ({ 0: "desert", 1: "fairway", 2: "rough", 3: "green", 4: "sand", 5: "water", 6: "another green", 7: "waste area", 8: "scrub", 9: "tee", 10: "out of bounds" })[l] || "?"; }
   function clubNames(P) { const names = D.clubs.map(c => c.name); for (const c of (P.clubsOverride || [])) if (!names.includes(c.name)) names.push(c.name); return names; }
+  // The day's pin on one hole (session Q, 2026-10-09). A hole record may carry the pin that hole was played to — { pin: "front" | "middle" |
+  // "back", pin_lat: yards beside the hole line, − left / + right as seen from the fairway } — from the day's pin sheet (index.html). It
+  // overrides the round's single pin setting for that hole only; a record without one is priced under the round's setting, as before.
+  // Mirrors ledger.py pin_of / hole_params.
+  function pinOf(rec) { const p = rec && rec.pin; if (!p || typeof p !== "object" || ["front", "middle", "back"].indexOf(p.pin) < 0) return null; let lat = +p.pin_lat || 0; if (!isFinite(lat)) lat = 0; return { pin: p.pin, pin_lat: Math.max(-20, Math.min(20, lat)) }; }
+  function holeParams(P, rec) { const p = pinOf(rec); return p ? Object.assign({}, P, p) : P; }
 
   // Which club covers this distance from this lie? Nearest total; "partial wedge" below three quarters of the shortest club.
   function inferClub(totalYd, P, altf, fromLie, tee) {
@@ -41,7 +47,9 @@
   // ---------- one hole ----------
   // rec = { shots: [{x, y, src, acc, t, lie?, club?, intent?, pen?}], score, putts }   (shot = the position the ball was played FROM; shot 1 is the tee)
   function analyzeHole(c, h, rec, P) {
+    P = holeParams(P, rec);   // the hole's own pin of the day, when its record carries one (session Q)
     const shots = (rec && rec.shots) || []; const out = { hole: h.hole, par: h.par, card: h.card, score: rec && rec.score != null ? rec.score : null, putts: rec && rec.putts != null ? rec.putts : null, shots: [], flags: [], E_tee: null, sgTotal: null, sgSum: null, cats: {}, marks: shots.length };
+    if (pinOf(rec)) out.pin = pinOf(rec);
     if (h.nodata || !h.grid || (h.src && h.src.fairway === "none" && h.par !== 3)) { out.kind = "unpriced"; out.flags.push("the engine does not price this hole (no measured line or surfaces)"); return out; }
     const altf = 1 + P.alt_rule / 100 * (c.alt_ft - P.home_ft) / 1000;
     const H = E.decodeHole(h); E.applyPin(H, P);
@@ -61,12 +69,14 @@
       // A position you played from is a found, playable ball: the engine's desert shares (played / dropped / lost) are for landings it cannot
       // see yet. Your penalty flag is the only thing that charges a penalty stroke, so a marked lie in the desert is priced as the desert lie
       // you are playing (rough plus the lie's extra, wider, shorter) and a marked lie in water as a rough lie — never a penalty twice.
-      const playedFromHazard = lie === L.DESERT || lie === L.WATER; if (lie === L.WATER) lie = L.ROUGH;
+      // A ball played from where the map draws out of bounds was in bounds there (the map's boundary is off): a found desert ball, flagged.
+      const markedOB = lie === L.OB; const playedFromHazard = lie === L.DESERT || lie === L.WATER || markedOB; if (lie === L.WATER) lie = L.ROUGH; if (markedOB) lie = L.DESERT;
       const rYd = distYd(pos, H.pin);
       const o = { i, pos: [round2(pos[0]), round2(pos[1])], lie, gridLie, lieSet: s.lie != null, playedFromHazard, rYd: Math.round(rYd), rFt: Math.round(rYd * 3), onGreen: lie === L.GREEN, pen: s.pen || 0, src: s.src || null, acc: s.acc != null ? Math.round(s.acc) : null, t: s.t || null, club: s.club || null, intentSet: s.intent || null, flags: [] };
       if (isTee && s.x != null && s.y != null && Math.hypot(s.x, s.y) > 40) o.flags.push(`marked ${Math.round(Math.hypot(s.x, s.y) / YD)} yd from the mapped tee; priced from the tee`);
       if (!inFrame) o.flags.push("off this hole's map — not priced");
       if (s.acc > 12) o.flags.push(`GPS fix ±${Math.round(s.acc)} m`);
+      if (markedOB) o.flags.push("marked where the map draws out of bounds — priced as a found ball in the desert (the mapped boundary may be off here)");
       if (!inFrame) { o.E = null; return o; }
       if (isTee) { o.E = r.E; o._tee = r; return o; }
       // The chain value of a position is its price — the baseline for its lie and plays-like distance plus the penalty terms — exactly what
@@ -309,17 +319,21 @@
     const execAs = (h, ball, ap, altf2) => { const b = ap.best; const r2 = E.approach(h, ball, X, altf2, { n: 600, keep: 120, lats: [b.lat], depths: [b.depth], club: ap.club && !/^easy /.test(ap.club) ? ap.club : undefined }); return r2 && r2.best ? r2 : ap; };
     for (const h of c.holes) {
       if (h.nodata || !h.grid || (h.src.fairway === "none" && h.par !== 3)) continue;
-      const H = E.decodeHole(h); E.applyPin(H, P); const shots = [{ x: 0, y: 0, src: "sim" }]; let pos = [0, 0]; let pen = 0; let holed = false; let putts = 0; let guard = 0;
+      const H = E.decodeHole(h); E.applyPin(H, P); const shots = [{ x: 0, y: 0, src: "sim" }]; let pos = [0, 0]; let pen = 0; let holed = false; let putts = 0; let guard = 0; let teeSample = null;
       // tee shot: the engine's pick, except every third hole where a plan club exists and differs (a decision to price)
       if (h.par !== 3) { const r = E.runHole(c, h, P, { n: 800 }); let club = r.pick.club; if (h.plan && h.plan.club && h.plan.club !== club && h.hole % 3 === 0) club = h.plan.club; let o = r.options.find(x => x.club === club) || E.teeOptions(h, P, altf, { n: 800, keep: 120, clubs: [club] })[0];
         if (X) o = E.teeOptions(h, X, altf, { n: 800, keep: 120, clubs: [club], aims: [o.best.aim] })[0];   // aimed with the player's normal pattern, played with the day's
         shots[0].club = club;   // the simulation knows what it hit: the club is set, as a real round's tee-off sets it (session N)
-        const s = pick(o.best.sample); pos = [s[0], s[1]]; }
-      else { let ap = E.approach(h, [0, 0], P, altf, { n: 600, keep: 120 }); if (!ap.best) continue; if (X) ap = execAs(h, [0, 0], ap, altf); const s = pick(ap.best.sample); pos = [s[0], s[1]]; }
+        teeSample = o.best.sample; const s = pick(o.best.sample); pos = [s[0], s[1]]; }
+      else { let ap = E.approach(h, [0, 0], P, altf, { n: 600, keep: 120 }); if (!ap.best) continue; if (X) ap = execAs(h, [0, 0], ap, altf); teeSample = ap.best.sample; const s = pick(ap.best.sample); pos = [s[0], s[1]]; }
       while (!holed && guard++ < 10) {
         // penalty: the ball is in water or desert → drop back toward where it came from, one stroke
         let lie = E.lieAt(H, pos[0], pos[1]); const prev = shots[shots.length - 1]; let penHere = 0;
-        if (lie === L.WATER || lie === L.DESERT) { const px = prev.x, py = prev.y; for (let step = 5; step <= 80; step += 5) { const t = step / Math.hypot(pos[0] - px, pos[1] - py); if (t >= 1) break; const q = [pos[0] + (px - pos[0]) * t, pos[1] + (py - pos[1]) * t]; const ql = E.lieAt(H, q[0], q[1]); if (ql !== L.WATER && ql !== L.DESERT) { pos = q; lie = ql; break; } } penHere = 1; pen++; }
+        if (lie === L.OB) {   // out of bounds: stroke and distance (session P) — the next stroke is played from where the last one was
+          penHere = 1; pen++; pos = [prev.x, prev.y]; lie = (pos[0] === 0 && pos[1] === 0) ? L.TEE : E.lieAt(H, pos[0], pos[1]);
+          if (lie === L.TEE && teeSample) { shots.push({ x: 0, y: 0, src: "sim", pen: 1 }); const s = pick(teeSample); pos = [s[0], s[1]]; continue; }   // a provisional-free re-tee: another ball from the same pattern
+        }
+        else if (lie === L.WATER || lie === L.DESERT) { const px = prev.x, py = prev.y; for (let step = 5; step <= 80; step += 5) { const t = step / Math.hypot(pos[0] - px, pos[1] - py); if (t >= 1) break; const q = [pos[0] + (px - pos[0]) * t, pos[1] + (py - pos[1]) * t]; const ql = E.lieAt(H, q[0], q[1]); if (ql !== L.WATER && ql !== L.DESERT) { pos = q; lie = ql; break; } } penHere = 1; pen++; }
         shots.push({ x: Math.round(pos[0] * 10) / 10, y: Math.round(pos[1] * 10) / 10, src: "sim", pen: penHere });
         const rYd = distYd(pos, H.pin);
         if (lie === L.GREEN) { const exp = E.baseAt(gr, rYd * 3); putts = Math.max(1, Math.floor(exp) + (rand() < exp - Math.floor(exp) ? 1 : 0)); holed = true; break; }
@@ -343,5 +357,5 @@
     return round;
   }
 
-  window.LoopLedger = { snapshot, stampRound, stampDrift, modelStamp, curveId, COND_KEYS, MODEL_KEYS, analyzeHole, analyzeRound, assemble, roundParams, holesToAnalyze, patterns, review, playerModel, simulateRound, inferClub, offsets, shotText, whereTo, CATS, CAT_LABEL, lieWord, allShots };
+  window.LoopLedger = { snapshot, stampRound, stampDrift, modelStamp, curveId, COND_KEYS, MODEL_KEYS, analyzeHole, analyzeRound, assemble, roundParams, holeParams, pinOf, holesToAnalyze, patterns, review, playerModel, simulateRound, inferClub, offsets, shotText, whereTo, CATS, CAT_LABEL, lieWord, allShots };
 })();
