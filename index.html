@@ -6,7 +6,7 @@
 <meta name="description" content="A caddie for the courses you play, built from your own data: lidar elevation, mapped surfaces, your dispersion, the written plans.">
 <meta name="color-scheme" content="light dark">
 <title>Loop</title>
-<meta name="loop-build" content="e2017b620f">
+<meta name="loop-build" content="b568c3bba3">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -377,7 +377,7 @@ function windText(){ const p=state.P; if(!(p.wind_mph>0)) return "calm"; const d
 const PIN_DEPTHS = ["back", "middle", "front"], PIN_COLS = ["left", "centre", "right"];
 function sheetFor(c){ const s = state.pins[c.key]; return s && s.date === today() && s.holes ? s.holes : {}; }
 function sheetPin(c, h){ const p = sheetFor(c)[h.hole]; return p && PIN_DEPTHS.includes(p.pin) ? p : null; }
-function holeP(c, h){ const p = sheetPin(c, h); return p ? Object.assign({}, state.P, { pin: p.pin, pin_lat: Math.max(-20, Math.min(20, +p.pin_lat || 0)) }) : state.P; }
+function holeP(c, h){ const p = sheetPin(c, h); if (!p) return state.P; const lat = PIN_COLS.includes(p.col) && h.grid ? pinCells(h)[p.pin][p.col] : (+p.pin_lat || 0); return Object.assign({}, state.P, { pin: p.pin, pin_lat: Math.max(-20, Math.min(20, lat)) }); }   // the side is the cell on the green as it is now (a Fix green re-reads it)
 function pinKey(c, h){ const P = holeP(c, h); return P.pin + "|" + (+P.pin_lat || 0); }
 function nSheet(c){ return Object.keys(sheetFor(c)).length; }
 function pinCol(p){ const l = +p.pin_lat || 0; return PIN_COLS.includes(p.col) ? p.col : l < 0 ? "left" : l > 0 ? "right" : "centre"; }
@@ -925,10 +925,15 @@ function bindPinRow(c, h){
     setSheetPin(c, h, { pin: dep, pin_lat: pinCells(h)[dep][col], col }); }));
   const pc = $("#pinClear"); if (pc) pc.addEventListener("click", () => setSheetPin(c, h, null));
 }
-// The round a pin set now belongs to: the round in progress on this course (finished rounds keep the pins they were played to).
-function pinRound(c){ const a = activeRound(); return a && a.course === c.key && !a.sample ? a : null; }
+// The round a pin set now belongs to: the round in progress on this course, if it was started today (finished rounds, and a round left
+// unfinished on an earlier day, keep the pins they were played to).
+function pinRound(c){ const a = activeRound(); return a && a.course === c.key && !a.sample && a.date === today() ? a : null; }
+// A tapped point ("from here?", a mark, Follow) on the hole on screen, priced again to its pin of the day after the pin changed.
+function repriceTap(c){ const t = state.tap; if (!t || !t.res || state.course !== c.key) return; const h = hole(); if (!h || h.nodata) return; const Ph = holeP(c, h); t.res = E.approach(h, [t.x, t.y], Ph, altf(c), { n: 1200 }); t.gl = t.res.from >= 160 ? E.goVsLay(h, [t.x, t.y], Ph, altf(c)) : null; }
 // Copy today's sheet pin into a hole record a round dated today has just created (the ledger prices the hole to it).
-function stampPin(r, hn){ if (!r || r.sample || r.date !== today()) return; const c = course_(r.course); const rec = r.holes && r.holes[hn]; if (!c || !rec || rec.pin !== undefined) return; const p = sheetFor(c)[hn]; if (p && PIN_DEPTHS.includes(p.pin)) rec.pin = { pin: p.pin, pin_lat: Math.max(-20, Math.min(20, +p.pin_lat || 0)) }; }
+function stampPin(r, hn){ if (!r || r.sample || r.date !== today()) return; const c = course_(r.course); const rec = r.holes && r.holes[hn]; if (!c || !rec || rec.pin !== undefined) return; const h = c.holes.find(x => x.hole === +hn); const p = h ? sheetPin(c, h) : null; if (p) rec.pin = recPin(c, h, p); }
+// What a round's hole record keeps of the day's pin: depth, the yards it was priced to, and the cell (for the label only; the ledgers read depth and yards).
+function recPin(c, h, p){ const o = { pin: p.pin, pin_lat: holeP(c, h).pin_lat }; if (PIN_COLS.includes(p.col)) o.col = p.col; return o; }
 function setSheetPin(c, h, v){
   const cur = state.pins[c.key] && state.pins[c.key].date === today() ? state.pins[c.key] : { date: today(), holes: {} };
   if (v) cur.holes[h.hole] = { pin: v.pin, pin_lat: Math.max(-20, Math.min(20, Math.round(+v.pin_lat || 0))), col: v.col }; else delete cur.holes[h.hole];
@@ -936,13 +941,13 @@ function setSheetPin(c, h, v){
   for (const k in state.pins) if (!state.pins[k] || state.pins[k].date !== today()) delete state.pins[k];   // yesterday's pins are gone for good
   store.set("pins", state.pins);
   const r = pinRound(c); const rec = r && r.holes ? r.holes[h.hole] : null;
-  if (rec) { if (v) rec.pin = { pin: cur.holes[h.hole].pin, pin_lat: cur.holes[h.hole].pin_lat }; else delete rec.pin; invalidateLedger(r.id, h.hole); saveRounds(); }
+  if (rec) { if (v) rec.pin = recPin(c, h, cur.holes[h.hole]); else delete rec.pin; invalidateLedger(r.id, h.hole); saveRounds(); }
   const R = getResults(c); delete R.holes[h.hole]; R.complete = false; if (R.busy) R.again = true;
-  if (state.tap && state.tap.res && state.hole === h.hole && state.course === c.key) { const t = state.tap; const Ph = holeP(c, h); t.res = E.approach(h, [t.x, t.y], Ph, altf(c), { n: 1200 }); t.gl = t.res.from >= 160 ? E.goVsLay(h, [t.x, t.y], Ph, altf(c)) : null; }
+  repriceTap(c);
   renderHeader(); if (state.view === "hole") renderHole(); if (state.view === "round") renderRound(); startBackground();
   const P = holeP(c, h); toast(v ? `Hole ${h.hole}: pin ${pinWords(cur.holes[h.hole])} (${pinYd(P)}) — today only.` : `Hole ${h.hole}: back to the chip's pin (${pinText().replace(/^pin /, "")}).`);
 }
-function clearSheet(c){ delete state.pins[c.key]; store.set("pins", state.pins); const r = pinRound(c); if (r && r.holes) { for (const hn in r.holes) if (r.holes[hn].pin) { delete r.holes[hn].pin; invalidateLedger(r.id, +hn); } saveRounds(); } state.results = {}; renderHeader(); if (state.view === "hole") renderHole(); if (state.view === "round") renderRound(); startBackground(); toast("Today's pins cleared: every hole uses the chip's pin."); }
+function clearSheet(c){ const was = sheetFor(c); delete state.pins[c.key]; store.set("pins", state.pins); const r = pinRound(c); if (r && r.holes) { for (const hn in was) if (r.holes[hn] && r.holes[hn].pin) { delete r.holes[hn].pin; invalidateLedger(r.id, +hn); } saveRounds(); } state.results = {}; repriceTap(c); renderHeader(); if (state.view === "hole") renderHole(); if (state.view === "round") renderRound(); startBackground(); toast("Today's pins cleared: every hole uses the chip's pin."); }
 // ---- the round's block on the hole page: marks, their prices, the score ----
 function clubOpts(sel){ return D.clubs.map(x => `<option ${sel===x.name?"selected":""}>${x.name}</option>`).join("") + `<option value="partial wedge" ${sel==="partial wedge"?"selected":""}>partial wedge</option>`; }
 function desertSharesText(){ const [p,u,l] = E.desertShares(state.P); return `${Math.round(p*100)} / ${Math.round(u*100)} / ${Math.round(l*100)} % by your settings (an estimate until your rounds say otherwise)`; }
@@ -954,7 +959,7 @@ function roundBlock(c, h){
   const r = currentRound(); const rec = r ? (r.holes||{})[h.hole] : null; const live = r && r.id === state.activeRound; let html = "";
   if (r && ((rec && (rec.shots.length || rec.score != null)) || live)) {
     const a = rec && (rec.shots.length || rec.score != null) ? ledgerHole(r, h) : null;
-    html += `<h2>Your round${live ? " — in progress" : " of " + esc(r.date || "")}${r.sample ? " · sample, simulated by the engine" : ""}${rec && LG.pinOf(rec) ? `<span style="font:400 13px var(--font);color:var(--mute)"> · pin ${pinWords(LG.pinOf(rec))}</span>` : ""}</h2><div class="marks">`;
+    html += `<h2>Your round${live ? " — in progress" : " of " + esc(r.date || "")}${r.sample ? " · sample, simulated by the engine" : ""}${rec && LG.pinOf(rec) ? `<span style="font:400 13px var(--font);color:var(--mute)"> · pin ${pinWords(Object.assign({}, LG.pinOf(rec), { col: rec.pin.col }))}</span>` : ""}</h2><div class="marks">`;
     if (!rec || !rec.shots.length) html += `<div class="row" style="color:var(--mute)">${live ? "No marks yet. Tee off, then mark the ball before every shot — each position is priced as you go." : "No positions were marked on this hole" + (rec && rec.score != null ? "; only the score." : ".")}</div>`;
     else rec.shots.forEach((s, i) => { const o = a && a.shots[i];
       html += `<div class="row"><span class="n">${i+1}</span><span>${i===0 ? "Tee" : `${o ? o.rYd : "?"} yd`}${o && i>0 ? `, ${o.playedFromHazard ? LG.lieWord(o.gridLie)+" (played)" : LG.lieWord(o.lie)}${o.onGreen ? " · " + o.rFt + " ft" : ""}` : ""}${s.src==="gps" ? ` <span class="chip" title="GPS fix">±${s.acc||"?"} m</span>` : s.src==="tap" ? ` <span class="chip">tapped</span>` : ""}${s.pen ? ` <span class="chip bad">penalty before</span>` : ""}</span>
